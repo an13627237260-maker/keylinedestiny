@@ -8,10 +8,17 @@ import { MysticCard } from "@/components/ui/mystic-card";
 import { MysticButton } from "@/components/ui/mystic-button";
 import { FormFieldShell } from "@/components/ui/form-field-shell";
 import { PillBadge } from "@/components/ui/pill-badge";
+import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
+import { generateZodiacFortune, getZodiacById, getZodiacSign } from "@/lib/fortune/zodiac";
+import { generateZodiacReport } from "@/lib/fortune/report/zodiacReport";
+import { toErrorResponse } from "@/lib/fortune/shared/errors";
+import { zodiacInputSchema } from "@/lib/fortune/shared/validation";
+import { saveReport } from "@/lib/storage/localReports";
 import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 
 export default function ZodiacPage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [period, setPeriod] = useState("daily");
   const [result, setResult] = useState<{
     algorithm_result: {
@@ -25,17 +32,43 @@ export default function ZodiacPage() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
     const p = (fd.get("period") as string) || "daily";
     setPeriod(p);
-    const res = await fetch("/api/zodiac", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ birthDate: fd.get("birthDate"), period: p }),
-    });
-    const data = await res.json();
-    if (data.success) setResult(data);
-    setLoading(false);
+
+    try {
+      const input = zodiacInputSchema.parse({
+        birthDate: fd.get("birthDate"),
+        period: p,
+      });
+      const date = input.date ?? new Date().toISOString().slice(0, 10);
+
+      const sign = input.zodiacSign
+        ? getZodiacById(input.zodiacSign) ?? getZodiacSign(input.birthDate ?? date)
+        : getZodiacSign(input.birthDate ?? date);
+
+      const fortune = generateZodiacFortune(sign, input.period, date);
+      const algorithm_result = { sign, fortune, period: input.period, date };
+      const report = generateZodiacReport(algorithm_result);
+      const data = buildFortuneSuccess("zodiac", input, algorithm_result, [
+        {
+          step: "zodiac_fortune",
+          title: "星座运势",
+          input: { sign: sign.id, date, period: input.period },
+          method: "deterministic seed = date + sign + period",
+          result: { seed: fortune.seed, themes: fortune.themes },
+          notes: ["娱乐型趋势解读，同一天同星座输出稳定"],
+        },
+      ], report);
+
+      setResult(data);
+      saveReport("zodiac", data);
+    } catch (err) {
+      setError(toErrorResponse(err).error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const sign = result?.algorithm_result.sign;
@@ -65,6 +98,7 @@ export default function ZodiacPage() {
         </MysticCard>
 
         <div>
+          {error && <p className="mb-4 text-sm text-[var(--danger)]">{error}</p>}
           {sign ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
               <MysticCard highlighted>

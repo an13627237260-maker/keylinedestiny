@@ -9,6 +9,12 @@ import { MysticButton } from "@/components/ui/mystic-button";
 import { FormFieldShell } from "@/components/ui/form-field-shell";
 import { TarotCardUI } from "@/components/tarot/TarotCard";
 import { TarotReadingResult } from "@/components/tarot/TarotReadingResult";
+import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
+import { drawTarotReading } from "@/lib/fortune/tarot";
+import { generateTarotReport } from "@/lib/fortune/report/tarotReport";
+import { toErrorResponse } from "@/lib/fortune/shared/errors";
+import { tarotInputSchema } from "@/lib/fortune/shared/validation";
+import { saveReport } from "@/lib/storage/localReports";
 import type { CalculationStep } from "@/lib/fortune/shared/types";
 import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 
@@ -32,18 +38,22 @@ export default function TarotPage() {
 
     const fd = new FormData(e.currentTarget);
     try {
-      const res = await fetch("/api/tarot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: fd.get("question"), spread: fd.get("spread") }),
+      const input = tarotInputSchema.parse({
+        question: (fd.get("question") as string) || undefined,
+        spread: fd.get("spread"),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message ?? "失败");
+      const { result: algoResult, steps } = drawTarotReading(
+        input.spread,
+        input.question,
+        input.seed,
+      );
+      const report = generateTarotReport(algoResult, input.question);
+      const data = buildFortuneSuccess("tarot", input, algoResult, steps, report);
+
       setResult(data);
-      const { saveReport } = await import("@/lib/storage/localReports");
       saveReport("tarot", data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "未知错误");
+      setError(toErrorResponse(err).error.message);
     } finally {
       setLoading(false);
     }

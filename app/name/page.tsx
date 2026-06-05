@@ -8,10 +8,17 @@ import { MysticCard } from "@/components/ui/mystic-card";
 import { MysticButton } from "@/components/ui/mystic-button";
 import { FormFieldShell } from "@/components/ui/form-field-shell";
 import { PillBadge } from "@/components/ui/pill-badge";
+import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
+import { analyzeName } from "@/lib/fortune/name";
+import { generateNameReport } from "@/lib/fortune/report/nameReport";
+import { toErrorResponse } from "@/lib/fortune/shared/errors";
+import { nameInputSchema } from "@/lib/fortune/shared/validation";
+import { saveReport } from "@/lib/storage/localReports";
 import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 
 export default function NamePage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [result, setResult] = useState<{
     algorithm_result: Record<string, unknown>;
     report: FortuneReport;
@@ -20,15 +27,38 @@ export default function NamePage() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/name", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: fd.get("name"), script: fd.get("script") }),
-    });
-    const data = await res.json();
-    if (data.success) setResult(data);
-    setLoading(false);
+
+    try {
+      const input = nameInputSchema.parse({
+        name: fd.get("name"),
+        script: fd.get("script"),
+      });
+      const { algorithm_result, calculation_steps, warnings } = analyzeName(
+        input.name,
+        input.script,
+      );
+      const report = generateNameReport(
+        algorithm_result as unknown as Parameters<typeof generateNameReport>[0],
+      );
+      const data = buildFortuneSuccess(
+        "name",
+        input,
+        algorithm_result,
+        calculation_steps,
+        report,
+        [],
+        warnings,
+      );
+
+      setResult(data);
+      saveReport("name", data);
+    } catch (err) {
+      setError(toErrorResponse(err).error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const fg = result?.algorithm_result?.fiveGrid as Record<string, number> | undefined;
@@ -57,6 +87,7 @@ export default function NamePage() {
         </MysticCard>
 
         <div>
+          {error && <p className="mb-4 text-sm text-[var(--danger)]">{error}</p>}
           {result ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
               {fg ? (

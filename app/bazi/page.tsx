@@ -8,6 +8,13 @@ import { PillBadge } from "@/components/ui/pill-badge";
 import { BaziForm } from "@/components/bazi/BaziForm";
 import { BaziResultPanels } from "@/components/bazi/bazi-result-panels";
 import { EmptyBaziState } from "@/components/bazi/EmptyBaziState";
+import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
+import { computeBazi } from "@/lib/fortune/bazi";
+import { runBaziRules } from "@/lib/fortune/rules/baziRules";
+import { generateBaziReport } from "@/lib/fortune/report/baziReport";
+import { toErrorResponse } from "@/lib/fortune/shared/errors";
+import { validateTimezone } from "@/lib/fortune/shared/time";
+import { baziInputSchema } from "@/lib/fortune/shared/validation";
 import { saveReport } from "@/lib/storage/localReports";
 import type { BaziAlgorithmResult } from "@/lib/fortune/bazi";
 import type { CalculationStep } from "@/lib/fortune/shared/types";
@@ -29,31 +36,40 @@ export default function BaziPage() {
     setError("");
     const fd = new FormData(e.currentTarget);
     const body = {
-      name: fd.get("name") as string,
+      name: (fd.get("name") as string) || undefined,
       gender: fd.get("gender"),
       birthDate: fd.get("birthDate"),
       birthTime: fd.get("birthTime"),
-      birthPlace: fd.get("birthPlace"),
+      birthPlace: (fd.get("birthPlace") as string) || undefined,
       longitude: fd.get("longitude") ? Number(fd.get("longitude")) : undefined,
-      timezone: fd.get("timezone") || "Asia/Shanghai",
+      timezone: (fd.get("timezone") as string) || "Asia/Shanghai",
       useTrueSolarTime: fd.get("useTrueSolarTime") === "on",
-      focusArea: fd.get("focusArea") || "overall",
+      focusArea: (fd.get("focusArea") as string) || "overall",
       targetYear: fd.get("targetYear") ? Number(fd.get("targetYear")) : undefined,
-      options: { dayBoundaryMode: fd.get("dayBoundaryMode") || "midnight" },
+      options: { dayBoundaryMode: (fd.get("dayBoundaryMode") as string) || "midnight" },
     };
 
     try {
-      const res = await fetch("/api/bazi", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message ?? "请求失败");
+      const input = baziInputSchema.parse(body);
+      validateTimezone(input.timezone);
+
+      const { algorithm_result, calculation_steps, warnings } = computeBazi(input);
+      const rule_results = runBaziRules(algorithm_result, input.focusArea);
+      const report = generateBaziReport(algorithm_result, rule_results, input);
+      const data = buildFortuneSuccess(
+        "bazi",
+        input,
+        algorithm_result,
+        calculation_steps,
+        report,
+        rule_results,
+        warnings,
+      );
+
       setResult(data);
       saveReport("bazi", data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "未知错误");
+      setError(toErrorResponse(err).error.message);
     } finally {
       setLoading(false);
     }

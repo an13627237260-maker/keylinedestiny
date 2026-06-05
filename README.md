@@ -1,6 +1,6 @@
-# 命理测算 Web 应用 (fortune-mingli)
+# Keyline Destiny · 命理星盘
 
-纯算法命理测算平台：**不接任何大模型 API**，所有结果由传统命理算法、规则库与本地模板引擎生成。
+纯算法命理测算平台：**不接任何大模型 API**，所有结果由传统命理算法、规则库与本地模板引擎在浏览器端生成。
 
 > 本结果基于传统命理规则、算法模型与本地规则库生成，仅供娱乐和传统文化参考，不构成现实决策依据。
 
@@ -17,13 +17,12 @@
 ## 安装与启动
 
 ```bash
-cd ~/Projects/fortune-mingli
 npm install
 npm run dev     # http://localhost:3000
-npm run build && npm start
+npm run build   # 生成静态站点到 out/
 ```
 
-**无需 API Key，无需数据库。**
+**无需 API Key，无需数据库，无需服务端 API。**
 
 ## 测试
 
@@ -33,9 +32,10 @@ npm test
 
 ## 报告如何生成
 
-1. `computeBazi` 等算法模块输出 `algorithm_result` + `calculation_steps`
+1. 各页面在浏览器中直接 `import` 算法模块（如 `computeBazi`、`drawTarotReading`）
 2. `runBaziRules` 对 `algorithm_result` 执行 200+ 条规则，输出 `rule_results`
-3. `generateBaziReport` 结合算法结果与规则命中，经 `templateEngine` 组装章节化 `report`
+3. `generateBaziReport` 等模板生成器组装章节化 `report`
+4. 测算完成后自动写入 `localStorage`
 
 塔罗 / 星座 / 姓名 / 合盘同理，使用各自的 `*Report.ts` 模板生成器。
 
@@ -58,12 +58,35 @@ npm test
 
 规则引擎会自动去重、按类别限流并排序。
 
+## Cloudflare Pages 部署（推荐）
+
+1. 将仓库推送到 GitHub / GitLab
+2. 在 Cloudflare Dashboard → Workers & Pages → Create → Connect to Git
+3. 配置如下：
+
+| 设置项 | 值 |
+|--------|-----|
+| Framework preset | Next.js |
+| Build command | `npm run build` |
+| Build output directory | `out` |
+| Root directory | 留空（`package.json` 在仓库根目录时）或 `./` |
+
+4. 无需环境变量
+5. 部署完成后访问分配的 `*.pages.dev` 域名
+
+本地预览静态产物：
+
+```bash
+npm run build
+npx serve out
+```
+
 ## Vercel 部署
 
 1. 将仓库推送到 GitHub
 2. 在 Vercel 导入项目，Framework 选 Next.js
-3. 无需配置环境变量（可不设 `OPENAI_API_KEY` 等）
-4. Build Command: `npm run build`，Output 默认即可
+3. 无需配置环境变量
+4. Build Command: `npm run build`（`output: "export"` 会自动输出到 `out/`）
 
 ## 算法说明
 
@@ -93,11 +116,12 @@ npm test
 ## 项目结构
 
 ```
-app/                  # 页面与 API 路由
+app/                  # 页面（纯客户端测算）
 components/           # UI
 lib/fortune/bazi/     # 八字核心算法
 lib/fortune/rules/    # 规则引擎与规则库
 lib/fortune/report/   # 本地报告模板引擎
+lib/client/           # 客户端响应组装
 lib/storage/          # localStorage 历史报告
 tests/                # Vitest
 ```

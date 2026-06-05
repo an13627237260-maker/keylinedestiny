@@ -8,6 +8,15 @@ import { MysticCard } from "@/components/ui/mystic-card";
 import { MysticButton } from "@/components/ui/mystic-button";
 import { FormFieldShell } from "@/components/ui/form-field-shell";
 import { PillBadge } from "@/components/ui/pill-badge";
+import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
+import {
+  analyzeLoveCompatibility,
+  type LoveCompatibilityResult,
+} from "@/lib/fortune/bazi/compatibility";
+import { generateLoveReport } from "@/lib/fortune/report/loveReport";
+import { toErrorResponse } from "@/lib/fortune/shared/errors";
+import { loveInputSchema } from "@/lib/fortune/shared/validation";
+import { saveReport } from "@/lib/storage/localReports";
 import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 
 function PersonFields({ prefix, label }: { prefix: string; label: string }) {
@@ -37,35 +46,46 @@ function PersonFields({ prefix, label }: { prefix: string; label: string }) {
 
 export default function LovePage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [result, setResult] = useState<{
-    algorithm_result: Record<string, unknown>;
+    algorithm_result: LoveCompatibilityResult;
     report: FortuneReport;
   } | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
     const person = (p: string) => ({
       gender: fd.get(`${p}_gender`),
       birthDate: fd.get(`${p}_birthDate`),
       birthTime: fd.get(`${p}_birthTime`),
-      timezone: fd.get(`${p}_timezone`) || "Asia/Shanghai",
+      timezone: (fd.get(`${p}_timezone`) as string) || "Asia/Shanghai",
       useTrueSolarTime: false,
-      focusArea: "love",
+      focusArea: "love" as const,
     });
-    const res = await fetch("/api/love", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ personA: person("a"), personB: person("b") }),
-    });
-    const data = await res.json();
-    if (data.success) setResult(data);
-    setLoading(false);
+
+    try {
+      const input = loveInputSchema.parse({
+        personA: person("a"),
+        personB: person("b"),
+      });
+      const { result: algoResult, steps } = analyzeLoveCompatibility(input.personA, input.personB);
+      const report = generateLoveReport(algoResult);
+      const data = buildFortuneSuccess("love", input, algoResult, steps, report);
+
+      setResult(data);
+      saveReport("love", data);
+    } catch (err) {
+      setError(toErrorResponse(err).error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const algo = result?.algorithm_result;
-  const score = algo?.matchScore as number | undefined;
+  const score = algo?.matchScore;
 
   return (
     <AppShell>
@@ -76,6 +96,7 @@ export default function LovePage() {
           <PersonFields prefix="a" label="甲方命盘" />
           <PersonFields prefix="b" label="乙方命盘" />
         </div>
+        {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         <MysticButton type="submit" loading={loading} variant="primary">
           开始合盘
         </MysticButton>
@@ -100,14 +121,14 @@ export default function LovePage() {
           <div className="grid gap-4 md:grid-cols-2">
             <MysticCard title="吸引力">
               <ul className="space-y-2 text-sm text-[var(--text-muted)]">
-                {(algo.attractionPoints as string[])?.map((p, i) => (
+                {algo.attractionPoints.map((p, i) => (
                   <li key={i}>· {p}</li>
                 ))}
               </ul>
             </MysticCard>
             <MysticCard title="摩擦点">
               <ul className="space-y-2 text-sm text-[var(--text-muted)]">
-                {(algo.conflictPoints as string[])?.map((p, i) => (
+                {algo.conflictPoints.map((p, i) => (
                   <li key={i}>· {p}</li>
                 ))}
               </ul>
@@ -116,7 +137,7 @@ export default function LovePage() {
 
           <MysticCard title="五行互补">
             <div className="flex flex-wrap gap-2">
-              {(algo.complementaryElements as string[])?.map((el) => (
+              {algo.complementaryElements.map((el) => (
                 <PillBadge key={el} variant="gold">{el}</PillBadge>
               ))}
             </div>
