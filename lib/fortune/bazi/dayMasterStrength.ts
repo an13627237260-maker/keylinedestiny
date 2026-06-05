@@ -9,6 +9,7 @@ import {
 } from "./constants";
 import type { HiddenStemEntry } from "./hiddenStems";
 import type { FourPillars } from "./pillars";
+import { analyzeBranchRelations } from "./branchRelations";
 
 export interface DayMasterStrengthAnalysis {
   dayMaster: HeavenlyStem;
@@ -52,6 +53,7 @@ export function analyzeDayMasterStrength(
   const supportFactors: string[] = [];
   const weakeningFactors: string[] = [];
   const reasoning: string[] = [];
+  const branchRelations = analyzeBranchRelations(pillars).analysis;
 
   const monthRelation = relationToDayMaster(dayMasterElement, monthElement);
   if (monthRelation === "same" || monthRelation === "resource") {
@@ -94,30 +96,71 @@ export function analyzeDayMasterStrength(
     }
   }
 
-  for (const branch of [pillars.year.branch, pillars.month.branch, pillars.day.branch, pillars.hour.branch]) {
+  const branchRoles = [
+    { key: "year", branch: pillars.year.branch, weight: 0.8, label: "年支" },
+    { key: "month", branch: pillars.month.branch, weight: 1.5, label: "月支" },
+    { key: "day", branch: pillars.day.branch, weight: 1.15, label: "日支" },
+    { key: "hour", branch: pillars.hour.branch, weight: 0.8, label: "时支" },
+  ] as const;
+
+  for (const item of branchRoles) {
+    const { branch, weight, label } = item;
     const main = BRANCH_ELEMENT[branch];
     if (main === dayMasterElement) {
-      score += branch === pillars.month.branch ? 8 : 6;
-      supportFactors.push(`地支${branch}有根`);
+      score += 6 * weight;
+      supportFactors.push(`${label}${branch}主气为日主根气`);
     }
     for (const hs of hiddenStems[branch] ?? []) {
       const el = STEM_ELEMENT[hs.stem];
       if (el === dayMasterElement) {
-        score += 4 * hs.weight;
-        supportFactors.push(`地支${branch}藏${hs.stem}为日主根气`);
+        score += 4 * hs.weight * weight;
+        supportFactors.push(`${label}${branch}藏${hs.stem}为日主根气`);
       } else if (ELEMENT_GENERATES[el] === dayMasterElement) {
-        score += 5 * hs.weight;
-        supportFactors.push(`地支${branch}藏${hs.stem}印星生扶`);
+        score += 5 * hs.weight * weight;
+        supportFactors.push(`${label}${branch}藏${hs.stem}印星生扶`);
       } else if (ELEMENT_CONTROLS[el] === dayMasterElement) {
-        score -= 4 * hs.weight;
-        weakeningFactors.push(`地支${branch}藏${hs.stem}官杀克身`);
+        score -= 4 * hs.weight * weight;
+        weakeningFactors.push(`${label}${branch}藏${hs.stem}官杀克身`);
       } else if (ELEMENT_GENERATES[dayMasterElement] === el) {
-        score -= 3 * hs.weight;
-        weakeningFactors.push(`地支${branch}藏${hs.stem}食伤泄身`);
+        score -= 3 * hs.weight * weight;
+        weakeningFactors.push(`${label}${branch}藏${hs.stem}食伤泄身`);
       } else if (ELEMENT_CONTROLS[dayMasterElement] === el) {
-        score -= 3 * hs.weight;
-        weakeningFactors.push(`地支${branch}藏${hs.stem}财星耗身`);
+        score -= 3 * hs.weight * weight;
+        weakeningFactors.push(`${label}${branch}藏${hs.stem}财星耗身`);
       }
+    }
+  }
+
+  for (const relation of [
+    ...branchRelations.clashes,
+    ...branchRelations.harms,
+    ...branchRelations.punishments,
+  ]) {
+    const touchesRoot = relation.branches.some(
+      (branch) => BRANCH_ELEMENT[branch] === dayMasterElement,
+    );
+    if (!touchesRoot) continue;
+    const important =
+      relation.pillars.includes("month") || relation.pillars.includes("day");
+    const delta = relation.type === "六冲" ? (important ? -7 : -4) : important ? -4 : -2;
+    score += delta;
+    weakeningFactors.push(`${relation.description}影响日主根气`);
+    reasoning.push(`${relation.description}涉及${relation.affectedArea.join("、")}，对根气按${Math.abs(delta)}分级扣分。`);
+  }
+
+  for (const relation of branchRelations.meetings) {
+    if (relation.confidence < 90) {
+      reasoning.push(`${relation.description}为倾向，未按成局大幅改变日主强弱。`);
+      continue;
+    }
+    const supports = relation.description.includes(dayMasterElement);
+    const resource = relation.description.includes(resourceElement);
+    if (supports || resource) {
+      score += 5;
+      supportFactors.push(`${relation.description}对日主或印星有助力`);
+    } else {
+      score -= 3;
+      weakeningFactors.push(`${relation.description}改变局中五行势，日主承压增加`);
     }
   }
 

@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import { pillarToString } from "../bazi/ganzhi";
 import type { EvidenceItem } from "../rules/evidence";
 import type { LuckPeriodRange } from "./periodResolver";
@@ -10,6 +11,8 @@ import type {
   PeriodInsights,
 } from "./types";
 import { LUCK_CATEGORY_COLORS, LUCK_CATEGORY_LABELS } from "./types";
+
+const TIMEZONE = "Asia/Shanghai";
 
 export function scoreToLevel(score: number): string {
   if (score >= 90) return "极佳";
@@ -303,6 +306,7 @@ export function buildPeriodInsights(
 
   const bestTimes: string[] = [];
   const cautionTimes: string[] = [];
+  const rangeYear = DateTime.fromJSDate(range.startDate).setZone(TIMEZONE).year;
 
   if (period === "week") {
     bestTimes.push(`本周${best.label}方向较突出（${best.score}分）`);
@@ -311,8 +315,8 @@ export function buildPeriodInsights(
     bestTimes.push(`本月上旬宜布局，中旬流月${transit.month.pillar}主导`);
     cautionTimes.push(`本月下旬留意${worst.label}波动`);
   } else if (period === "year") {
-    bestTimes.push(`${range.startDate.getFullYear()}年${best.label}趋势相对平稳`);
-    cautionTimes.push(`${range.startDate.getFullYear()}年${worst.label}需留神`);
+    bestTimes.push(`${rangeYear}年${best.label}趋势相对平稳`);
+    cautionTimes.push(`${rangeYear}年${worst.label}需留神`);
   } else {
     bestTimes.push(`今日${best.label}较顺（${best.score}分）`);
     cautionTimes.push(`今日${worst.label}宜留意（${worst.score}分）`);
@@ -326,7 +330,7 @@ export function buildPeriodInsights(
   } else if (period === "month") {
     mainTheme = `本月流月${transit.month.pillar}（${transit.month.stemTenGod}）主导全月主题`;
   } else {
-    mainTheme = `${range.startDate.getFullYear()}年流年${transit.year.pillar}定义全年主轴`;
+    mainTheme = `${rangeYear}年流年${transit.year.pillar}定义全年主轴`;
   }
 
   const actionSuggestion =

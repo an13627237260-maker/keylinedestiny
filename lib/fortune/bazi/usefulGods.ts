@@ -48,6 +48,7 @@ export function analyzeUsefulGods(algo: UsefulGodsInput): {
     if (mother) useful.push(mother);
     avoid = [controls[dmEl], generates[dmEl]].filter(Boolean) as FiveElement[];
     reasoning.push("日主偏弱，倾向印比帮身，忌过重伤官财");
+    reasoning.push("病药思路：弱则先扶身，再看财官食伤能否承载。");
     confidence = 70;
   } else if (dm.strengthLevel === "strong") {
     useful = [controls[dmEl], generates[dmEl]];
@@ -57,6 +58,7 @@ export function analyzeUsefulGods(algo: UsefulGodsInput): {
     )?.[0];
     if (mother) avoid.push(mother);
     reasoning.push("日主偏强，倾向食伤财官泄耗制化");
+    reasoning.push("病药思路：强则取泄耗制化，避免比印继续加重。");
     confidence = 68;
   } else {
     useful = five.usefulElementTendency as FiveElement[];
@@ -89,6 +91,13 @@ export function analyzeUsefulGods(algo: UsefulGodsInput): {
     if (mother) regulating.push(mother);
   }
 
+  if (dm.strengthLevel === "weak" && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 3) {
+    reasoning.push("财旺身弱时只记录从财可能性，未满足极端条件前不按从格定用。");
+  }
+  if (dm.strengthLevel === "weak" && (tg.counts["七杀"] ?? 0) > 3) {
+    reasoning.push("杀重身弱时只记录从杀可能性，未满足极端条件前不按从格定用。");
+  }
+
   useful = [...new Set(useful)].slice(0, 3);
   avoid = [...new Set(avoid)].slice(0, 3);
   regulating = [...new Set(regulating)].filter((el) => !useful.includes(el)).slice(0, 3);
@@ -99,16 +108,16 @@ export function analyzeUsefulGods(algo: UsefulGodsInput): {
     regulatingElementTendency: regulating,
     reasoning,
     confidence,
-    caution: "喜用神仅为倾向分析，不等于缺什么补什么",
+    caution: "当前为喜用倾向，不等同于专业命理师定用神。",
   };
 
   return {
     analysis,
     step: {
       step: "useful_gods",
-      title: "喜用神倾向",
+      title: "喜用倾向分析",
       input: { strengthLevel: dm.strengthLevel },
-      method: "综合日主强弱、五行平衡、十神结构、调候",
+      method: "综合日主强弱、月令、五行偏颇、十神结构、调候、通关、病药与从格可能性",
       result: analysis as unknown as Record<string, unknown>,
       notes: [analysis.caution],
     },

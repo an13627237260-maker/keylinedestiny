@@ -6,6 +6,7 @@ import {
   STEM_ELEMENT,
   type EarthlyBranch,
   type FiveElement,
+  type HeavenlyStem,
 } from "../bazi/constants";
 import {
   getDayPillarIndex,
@@ -15,7 +16,10 @@ import {
   type Pillar,
 } from "../bazi/ganzhi";
 import type { LuckCycleEntry } from "../bazi/luckCycle";
-import { getMonthPillar, getYearPillar } from "../bazi/pillars";
+import {
+  getTransitMonthPillarBySolarTerm,
+  getYearPillar,
+} from "../bazi/pillars";
 import { getTenGod, type TenGod } from "../bazi/tenGods";
 import {
   inferEvidencePolarity,
@@ -92,9 +96,9 @@ function branchesPair(
   return pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 }
 
-function getDayPillarForDate(date: Date): Pillar {
+export function getDayPillarForDateTime(dateTime: DateTime): Pillar {
   return getSexagenary(
-    getDayPillarIndex(date.getFullYear(), date.getMonth() + 1, date.getDate()),
+    getDayPillarIndex(dateTime.year, dateTime.month, dateTime.day),
   );
 }
 
@@ -110,20 +114,20 @@ function getLuckCycleAtYear(
 function buildTransitPillar(
   type: TransitPillar["type"],
   pillar: Pillar,
-  date: Date,
-  dayMaster: string,
+  dateTime: DateTime,
+  dayMaster: HeavenlyStem,
 ): TransitPillar {
   const hidden = BRANCH_HIDDEN_STEMS[pillar.branch] ?? [];
-  const branchGods = hidden.map((s) => `${s}·${getTenGod(dayMaster as never, s)}`);
+  const branchGods = hidden.map((s) => `${s}·${getTenGod(dayMaster, s)}`);
   return {
     type,
-    date: formatDate(date),
+    date: dateTime.toFormat("yyyy-MM-dd"),
     pillar: pillarToString(pillar),
     stem: pillar.stem,
     branch: pillar.branch,
     stemElement: STEM_ELEMENT[pillar.stem],
     branchElement: BRANCH_ELEMENT[pillar.branch],
-    stemTenGod: getTenGod(dayMaster as never, pillar.stem),
+    stemTenGod: getTenGod(dayMaster, pillar.stem),
     branchTenGods: branchGods,
   };
 }
@@ -330,24 +334,25 @@ export function calculateTransitContext(
   date: Date,
 ): TransitContext {
   const dm = bazi.pillars.day.stem;
-  const dt = DateTime.fromObject(
-    {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate(),
-      hour: 12,
-    },
-    { zone: TIMEZONE },
-  );
+  const dt = DateTime.fromJSDate(date).setZone(TIMEZONE).set({
+    hour: 12,
+    minute: 0,
+    second: 0,
+    millisecond: 0,
+  });
 
   const yearResult = getYearPillar(dt, TIMEZONE);
-  const monthResult = getMonthPillar(dt, yearResult.pillar.stem, TIMEZONE);
-  const dayPillar = getDayPillarForDate(date);
-  const luck = getLuckCycleAtYear(bazi, date.getFullYear());
+  const monthResult = getTransitMonthPillarBySolarTerm(
+    dt,
+    yearResult.pillar.stem,
+    TIMEZONE,
+  );
+  const dayPillar = getDayPillarForDateTime(dt);
+  const luck = getLuckCycleAtYear(bazi, dt.year);
 
-  const year = buildTransitPillar("year", yearResult.pillar, date, dm);
-  const month = buildTransitPillar("month", monthResult.pillar, date, dm);
-  const day = buildTransitPillar("day", dayPillar, date, dm);
+  const year = buildTransitPillar("year", yearResult.pillar, dt, dm);
+  const month = buildTransitPillar("month", monthResult.pillar, dt, dm);
+  const day = buildTransitPillar("day", dayPillar, dt, dm);
 
   const yearRelations = analyzeTransitRelations(
     year.branch,
@@ -398,7 +403,7 @@ export function calculateTransitContext(
   }
 
   const partial: Omit<TransitContext, "categorySignals"> = {
-    date,
+    date: dt.toJSDate(),
     year,
     month,
     day,
@@ -426,7 +431,7 @@ export function calculateTransitContext(
     transitEvidence(
       "month_transit",
       "流月干支",
-      `流月${month.pillar}，${month.stemTenGod}主导当月节奏`,
+      `流月${month.pillar}，${month.stemTenGod}主导当月节奏；节气区间${monthResult.boundaryTerm}至${monthResult.nextBoundary ?? "下一节"}`,
       2.6,
       [month.pillar],
     ),
@@ -489,13 +494,16 @@ export function getMonthPillarForCalendarMonth(
   year: number,
   month: number,
 ): Pillar {
-  const anchor = new Date(year, month - 1, 15);
   const dt = DateTime.fromObject(
-    { year: anchor.getFullYear(), month: anchor.getMonth() + 1, day: 15, hour: 12 },
+    { year, month, day: 15, hour: 12 },
     { zone: TIMEZONE },
   );
   const yearPillar = getYearPillar(dt, TIMEZONE);
-  return getMonthPillar(dt, yearPillar.pillar.stem, TIMEZONE).pillar;
+  return getTransitMonthPillarBySolarTerm(
+    dt,
+    yearPillar.pillar.stem,
+    TIMEZONE,
+  ).pillar;
 }
 
 export function deterministicTransitHash(

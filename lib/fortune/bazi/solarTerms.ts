@@ -61,7 +61,7 @@ export const MONTH_JIE_INDICES = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 0];
 
 type SolarTermTable = Partial<Record<number, readonly string[]>>;
 
-// 预留 1900-2100 精确节气表接口。当前未内置完整表，不能标记为精确表源。
+// 预留 1900-2100 节气表接口。当前未内置完整表，不能标记为表源。
 const SOLAR_TERM_TABLE_1900_2100: SolarTermTable = {};
 
 /**
@@ -191,14 +191,14 @@ export function getSolarTermPrecisionMeta(year: number): SolarTermPrecisionMeta 
         precision: "exact",
         tableRange: "1900-2100",
         tableAvailable: true,
-        note: "使用 1900-2100 精确节气表。",
+        note: "使用 1900-2100 节气表数据。",
       }
     : {
         source: "approx",
         precision: "approximate",
         tableRange: "1900-2100",
         tableAvailable: false,
-        note: "已预留 1900-2100 精确节气表接口；当前未内置完整表，使用近似算法。",
+        note: "已预留 1900-2100 节气表接口；当前未内置完整表，使用近似算法。",
       };
 }
 
@@ -343,7 +343,7 @@ export function checkSolarTermProximityWarnings(
     );
     if (diffHours <= 2) {
       warnings.push(
-        `出生时间非常接近节气切换，年柱或月柱建议使用精确节气表复核。相关节气：${term.name}（${term.dateTime.toFormat("yyyy-MM-dd HH:mm")}）。`,
+        `出生时间非常接近节气切换，年柱或月柱建议使用权威天文历节气时刻复核。相关节气：${term.name}（${term.dateTime.toFormat("yyyy-MM-dd HH:mm")}）。`,
       );
     } else if (diffHours <= 24) {
       warnings.push(

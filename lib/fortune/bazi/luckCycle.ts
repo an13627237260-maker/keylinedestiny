@@ -17,10 +17,20 @@ export interface LuckCycleEntry {
   interpretationTags: string[];
 }
 
+export interface LuckStartConversion {
+  diffDays: number;
+  diffHours: number;
+  equivalentYears: number;
+  equivalentMonths: number;
+  equivalentDays: number;
+  startAge: number;
+}
+
 export interface LuckCycleAnalysis {
   direction: "forward" | "backward" | "unknown";
   startAge: number;
   startDateApprox: string;
+  startConversion?: LuckStartConversion;
   cycles: LuckCycleEntry[];
   currentCycle?: LuckCycleEntry;
   warnings: string[];
@@ -44,6 +54,28 @@ function advancePillar(pillar: Pillar, steps: number): Pillar {
   return getSexagenary((pillar.index + steps + 60) % 60);
 }
 
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function calculateLuckStartConversion(totalHours: number): LuckStartConversion {
+  const safeHours = Math.max(0, Math.abs(totalHours));
+  const totalDays = safeHours / 24;
+  const equivalentYears = totalDays / 3;
+  return {
+    diffDays: round2(totalDays),
+    diffHours: round2(safeHours),
+    equivalentYears: round2(equivalentYears),
+    equivalentMonths: round2(totalDays * 4),
+    equivalentDays: round2((safeHours / 2) * 10),
+    startAge: round1(equivalentYears),
+  };
+}
+
 export function calculateLuckCycle(
   birthDateTime: DateTime,
   timezone: string,
@@ -61,6 +93,7 @@ export function calculateLuckCycle(
         direction: "unknown",
         startAge: 0,
         startDateApprox: "",
+        startConversion: undefined,
         cycles: [],
         currentCycle: undefined,
         warnings: ["gender unknown，不计算大运"],
@@ -90,14 +123,9 @@ export function calculateLuckCycle(
   }
 
   const termTime = targetTerm?.dateTime ?? birthDateTime;
-  const diffDays = Math.abs(termTime.diff(birthDateTime, "days").days);
-  const diffHoursRemainder =
-    Math.abs(termTime.diff(birthDateTime, "hours").hours) % 24;
-
-  const years = diffDays / 3;
-  const months = (diffDays % 3) * 4;
-  const days = (diffHoursRemainder / 2) * 10;
-  const startAge = Math.round((years + months / 12 + days / 365) * 10) / 10;
+  const diffHours = Math.abs(termTime.diff(birthDateTime, "hours").hours);
+  const conversion = calculateLuckStartConversion(diffHours);
+  const startAge = conversion.startAge;
 
   const startDateApprox =
     birthDateTime
@@ -132,6 +160,7 @@ export function calculateLuckCycle(
     direction,
     startAge,
     startDateApprox,
+    startConversion: conversion,
     cycles,
     currentCycle: cycles.find((cycle) => {
       const currentYear = DateTime.now().setZone(timezone).year;
@@ -157,7 +186,13 @@ export function calculateLuckCycle(
         startAge,
         startDateApprox,
         targetTerm: targetTerm?.name ?? null,
-        daysToTerm: diffDays,
+        targetTermAt: targetTerm?.dateTime.toISO() ?? null,
+        daysToTerm: conversion.diffDays,
+        diffDays: conversion.diffDays,
+        diffHours: conversion.diffHours,
+        equivalentYears: conversion.equivalentYears,
+        equivalentMonths: conversion.equivalentMonths,
+        equivalentDays: conversion.equivalentDays,
         firstCycle: cycles[0] ? pillarToString(cycles[0].pillar) : null,
         currentCycle: analysis.currentCycle
           ? {
@@ -168,7 +203,11 @@ export function calculateLuckCycle(
             }
           : null,
       },
-      notes: warnings,
+      notes: [
+        `目标节气：${targetTerm?.name ?? "未找到"}；距离约 ${conversion.diffDays} 天；起运年龄约 ${startAge.toFixed(1)} 岁。`,
+        "起运换算采用 totalDiffDays / 3，不重复叠加余数天数。",
+        ...warnings,
+      ],
     },
   };
 }

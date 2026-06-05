@@ -266,6 +266,8 @@ export function computeBazi(
     targetYear,
     pillars,
     input.focusArea,
+    timezone,
+    calibration?.solarTermContext,
   );
   steps.push(monthlyResult.step);
   monthlyLuckAnalysis = monthlyResult.months;

@@ -16,6 +16,7 @@ export interface BranchRelation {
   pillars: string[];
   description: string;
   confidence: number;
+  affectedArea: string[];
 }
 
 export interface BranchRelationsAnalysis {
@@ -113,12 +114,22 @@ function keysForBranches(
   return entries.filter((e) => target.includes(e.branch)).map((e) => e.key);
 }
 
+function affectedAreas(keys: string[]): string[] {
+  const map: Record<string, string> = {
+    year: "外部/家族背景",
+    month: "事业/环境",
+    day: "感情/内在稳定",
+    hour: "后期/计划",
+  };
+  return [...new Set(keys.map((key) => map[key] ?? key))];
+}
+
 function sanHeDescription(
   group: EarthlyBranch[],
   element: string,
   present: EarthlyBranch[],
 ): string {
-  if (present.length === 3) return `${group.join("")}三合${element}局`;
+  if (present.length === 3) return `${group.join("")}三合${element}局成局倾向`;
   const hasFirst = present.includes(group[0]);
   const hasMiddle = present.includes(group[1]);
   const hasLast = present.includes(group[2]);
@@ -133,7 +144,7 @@ function sanHuiDescription(
   element: string,
   present: EarthlyBranch[],
 ): string {
-  if (present.length === 3) return `${group.join("")}三会${element}势`;
+  if (present.length === 3) return `${group.join("")}三会${element}势成势`;
   return `${present.join("")}半会${element}势倾向`;
 }
 
@@ -160,8 +171,9 @@ export function analyzeBranchRelations(
         type: "六合",
         branches: he.pair,
         pillars: keys,
-        description: `合${he.element}`,
+        description: `${he.pair.join("")}六合${he.element}合象（未作合化定论）`,
         confidence: 75,
+        affectedArea: affectedAreas(keys),
       });
       interpretationTags.push("地支六合");
     }
@@ -176,6 +188,7 @@ export function analyzeBranchRelations(
         pillars: keysForBranches(entries, present),
         description: sanHeDescription(sh.group, sh.element, present),
         confidence: present.length === 3 ? 90 : 55,
+        affectedArea: affectedAreas(keysForBranches(entries, present)),
       });
     }
   }
@@ -189,6 +202,7 @@ export function analyzeBranchRelations(
         pillars: keysForBranches(entries, present),
         description: sanHuiDescription(sh.group, sh.element, present),
         confidence: present.length === 3 ? 90 : 55,
+        affectedArea: affectedAreas(keysForBranches(entries, present)),
       });
     }
   }
@@ -200,8 +214,9 @@ export function analyzeBranchRelations(
         type: "六冲",
         branches: pair,
         pillars: keys,
-        description: "六冲",
+        description: `${pair.join("")}六冲，提示对应领域变动或对立压力`,
         confidence: 80,
+        affectedArea: affectedAreas(keys),
       });
       interpretationTags.push("地支六冲");
     }
@@ -214,8 +229,9 @@ export function analyzeBranchRelations(
         type: "六害",
         branches: pair,
         pillars: keys,
-        description: "六害",
+        description: `${pair.join("")}六害，提示细节压力与内部摩擦`,
         confidence: 70,
+        affectedArea: affectedAreas(keys),
       });
     }
   }
@@ -228,6 +244,7 @@ export function analyzeBranchRelations(
       pillars: ziMao,
       description: "子卯刑",
       confidence: 85,
+      affectedArea: affectedAreas(ziMao),
     });
   }
 
@@ -243,6 +260,7 @@ export function analyzeBranchRelations(
         pillars: keysForBranches(entries, present),
         description: `${group.label}成立`,
         confidence: 90,
+        affectedArea: affectedAreas(keysForBranches(entries, present)),
       });
     } else if (present.length === 2) {
       punishments.push({
@@ -251,6 +269,7 @@ export function analyzeBranchRelations(
         pillars: keysForBranches(entries, present),
         description: `${present.join("")}刑势倾向（${group.label}未全）`,
         confidence: 55,
+        affectedArea: affectedAreas(keysForBranches(entries, present)),
       });
     }
   }
@@ -265,6 +284,7 @@ export function analyzeBranchRelations(
         pillars: entries.filter((e) => e.branch === branch).map((e) => e.key),
         description: `${branch}${branch}自刑`,
         confidence: 85,
+        affectedArea: affectedAreas(entries.filter((e) => e.branch === branch).map((e) => e.key)),
       });
     }
   }

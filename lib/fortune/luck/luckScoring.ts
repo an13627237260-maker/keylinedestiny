@@ -1,4 +1,5 @@
 import type { BaziAlgorithmResult } from "../bazi";
+import { DateTime } from "luxon";
 import { computeLocationLuckDelta } from "../location/regionElements";
 import { pillarToString } from "../bazi/ganzhi";
 import { getTenGod } from "../bazi/tenGods";
@@ -36,6 +37,7 @@ import type {
 const SCORE_MIN = 42;
 const SCORE_MAX = 96;
 const BASE_SCORE = 70;
+const TIMEZONE = "Asia/Shanghai";
 
 type SubCategory = Exclude<LuckCategory, "overall">;
 
@@ -179,7 +181,16 @@ function withFinalAdjustments(
 }
 
 function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return DateTime.fromJSDate(d).setZone(TIMEZONE).startOf("day").toJSDate();
+}
+
+function fixedWeekday(d: Date): number {
+  return DateTime.fromJSDate(d).setZone(TIMEZONE).weekday % 7;
+}
+
+function fixedYearMonth(d: Date): { year: number; month: number } {
+  const dt = DateTime.fromJSDate(d).setZone(TIMEZONE);
+  return { year: dt.year, month: dt.month };
 }
 
 export function getCategoryWeights(focusArea?: string): Record<SubCategory, number> {
@@ -387,7 +398,7 @@ function scoreWeekCategory(
   for (const d of dates) {
     const transit = calculateTransitContext(bazi, d);
     const { score, scoreBreakdown } = scoreDayCategory(bazi, transit, category, focusArea);
-    const w = weekdayCategoryWeight(d.getDay(), category);
+    const w = weekdayCategoryWeight(fixedWeekday(d), category);
     weighted += score * w;
     totalW += w;
     dailyScores.push({ date: d, score, breakdown: scoreBreakdown });
@@ -411,7 +422,7 @@ function scoreWeekCategory(
       "day_transit",
       category,
       "本周较强日期",
-      `本周${weekdays[best.date.getDay()]}（${formatDate(best.date)}）${category}节奏相对突出`,
+      `本周${weekdays[fixedWeekday(best.date)]}（${formatDate(best.date)}）${category}节奏相对突出`,
       2.2,
     ),
     scoreEvidence(
@@ -419,7 +430,7 @@ function scoreWeekCategory(
       "day_transit",
       category,
       "本周需留意日期",
-      `本周${weekdays[worst.date.getDay()]}（${formatDate(worst.date)}）宜保守、放慢节奏`,
+      `本周${weekdays[fixedWeekday(worst.date)]}（${formatDate(worst.date)}）宜保守、放慢节奏`,
       2,
     ),
   );
@@ -507,9 +518,8 @@ function scoreMonthCategory(
   const usefulGodImpact =
     anchorTransit.usefulGodAlignment * 0.1 - anchorTransit.avoidGodPressure * 0.08;
 
-  const y = range.startDate.getFullYear();
-  const m = range.startDate.getMonth() + 1;
-  const monthPillar = getMonthPillarForCalendarMonth(y, m);
+  const ym = fixedYearMonth(range.startDate);
+  const monthPillar = getMonthPillarForCalendarMonth(ym.year, ym.month);
   const monthGod = getTenGod(bazi.pillars.day.stem, monthPillar.stem);
 
   const evidence: EvidenceItem[] = [
@@ -570,7 +580,7 @@ function scoreYearCategory(
   category: SubCategory,
   focusArea?: string,
 ): CategoryScoreResult {
-  const y = range.startDate.getFullYear();
+  const y = fixedYearMonth(range.startDate).year;
   const anchorTransit = calculateTransitContext(bazi, range.anchorDate);
   const weights = { luck: 0.35, year: 0.4, month: 0.25 };
 
@@ -714,6 +724,7 @@ function buildCalculationBasis(
     "基于本命四柱、五行、十神、合冲刑害、神煞与流期干支",
     `流年 ${transit.year.pillar}（${transit.year.stemTenGod}）`,
     `流月 ${transit.month.pillar}（${transit.month.stemTenGod}，按节气月令切换）`,
+    "流日以 Asia/Shanghai 日期为准，使用日柱算法计算",
   ];
 
   if (range.period === "day") {

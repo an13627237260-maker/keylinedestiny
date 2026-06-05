@@ -53,7 +53,18 @@ describe("bazi structure outputs", () => {
     expect(Array.isArray(useful.avoidElementTendency)).toBe(true);
     expect(Array.isArray(useful.regulatingElementTendency)).toBe(true);
     expect(useful.reasoning.length).toBeGreaterThan(0);
-    expect(useful.caution).toContain("倾向");
+    expect(useful.caution).toBe("当前为喜用倾向，不等同于专业命理师定用神。");
+  });
+
+  it("格局只输出倾向或证据不足，不输出专业定格", () => {
+    expect(algorithm_result.patternTendencies.length).toBeGreaterThan(0);
+    for (const pattern of algorithm_result.patternTendencies) {
+      expect(pattern.confidence).toBeLessThanOrEqual(75);
+      expect(`${pattern.patternName}${pattern.cautions.join("")}`).toMatch(/倾向|证据不足|未作专业定格/);
+    }
+    const step = calculation_steps.find((item) => item.step === "patterns");
+    expect(step?.title).toContain("倾向");
+    expect(step?.notes?.join("")).toContain("未作专业定格");
   });
 
   it("大运输出 currentCycle 并写入 calculation_steps", () => {

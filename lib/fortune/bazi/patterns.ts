@@ -2,8 +2,10 @@ import type { CalculationStep } from "../shared/types";
 import type { TenGodsAnalysis } from "./tenGods";
 import type { DayMasterStrengthAnalysis } from "./dayMasterStrength";
 import type { SymbolicStar } from "./symbolicStars";
+import type { FourPillars } from "./pillars";
 
 interface PatternAlgoInput {
+  pillars: FourPillars;
   tenGods: TenGodsAnalysis;
   dayMasterStrength: DayMasterStrengthAnalysis;
   symbolicStars: SymbolicStar[];
@@ -26,9 +28,19 @@ export function analyzePatterns(algo: PatternAlgoInput): {
   const sorted = Object.entries(tg.counts).sort((a, b) => b[1] - a[1]);
   const top = sorted[0]?.[0] ?? "比肩";
   const second = sorted[1]?.[0] ?? "";
+  const monthBranch = algo.pillars.month.branch;
+  const monthMainGod = tg.hiddenStemGods
+    .filter((item) => item.branch === monthBranch)
+    .sort((a, b) => b.weight - a.weight)[0]?.god;
+  const exposedGods = new Set([
+    tg.pillarStemGods.year,
+    tg.pillarStemGods.month,
+    tg.pillarStemGods.hour,
+  ]);
   const tendencies: PatternTendency[] = [];
 
-  const add = (p: PatternTendency) => tendencies.push(p);
+  const add = (p: PatternTendency) =>
+    tendencies.push({ ...p, confidence: Math.min(75, p.confidence) });
 
   const godPatterns: Record<string, string> = {
     正官: "正官格倾向",
@@ -41,52 +53,58 @@ export function analyzePatterns(algo: PatternAlgoInput): {
     偏印: "偏印格倾向",
   };
 
-  if (godPatterns[top]) {
+  const hasMonthlyEvidence =
+    !!monthMainGod && (monthMainGod === top || exposedGods.has(monthMainGod));
+
+  if (godPatterns[monthMainGod ?? ""] && hasMonthlyEvidence) {
     add({
-      patternName: godPatterns[top],
-      confidence: Math.min(85, 50 + sorted[0][1] * 10),
-      evidence: [`月令与十神中${top}较突出`],
+      patternName: godPatterns[monthMainGod!],
+      confidence: 55 + Math.min(20, (tg.counts[monthMainGod!] ?? 0) * 6),
+      evidence: [
+        `月支${monthBranch}主气对应${monthMainGod}`,
+        exposedGods.has(monthMainGod!) ? `${monthMainGod}透干` : `${monthMainGod}未明显透干，仅作倾向`,
+      ],
       cautions: ["格局倾向不等于定论，需结合大运流年"],
-      interpretationTags: [top],
+      interpretationTags: [monthMainGod!],
     });
   }
 
   if (dm.strengthLevel === "strong" && (tg.counts["比肩"] ?? 0) + (tg.counts["劫财"] ?? 0) > 2) {
     add({
       patternName: "建禄格倾向",
-      confidence: 65,
-      evidence: ["日主偏强且比劫明显"],
+      confidence: monthMainGod === "比肩" || monthMainGod === "劫财" ? 65 : 55,
+      evidence: ["日主偏强且比劫明显", `月令主气为${monthMainGod ?? "未明"}`],
       cautions: ["需防固执与竞争消耗"],
       interpretationTags: ["身强", "比劫"],
     });
   }
 
   const hasYangBlade = algo.symbolicStars.some((s) => s.name === "羊刃" && s.found);
-  if (hasYangBlade) {
+  if (hasYangBlade && (monthMainGod === "比肩" || monthMainGod === "劫财")) {
     add({
       patternName: "羊刃格倾向",
-      confidence: 60,
-      evidence: ["命局见羊刃"],
+      confidence: 58,
+      evidence: ["命局见羊刃", "月令或比劫证据支持时只作羊刃倾向"],
       cautions: ["竞争与果断并存，宜修边界"],
       interpretationTags: ["羊刃"],
     });
   }
 
-  if (dm.strengthLevel === "weak" && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 2) {
+  if (dm.strengthLevel === "weak" && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 2 && (monthMainGod === "正财" || monthMainGod === "偏财")) {
     add({
       patternName: "身弱财重倾向",
-      confidence: 70,
-      evidence: ["财星旺而日主偏弱"],
+      confidence: 68,
+      evidence: ["财星旺而日主偏弱", `月令主气为${monthMainGod}`],
       cautions: ["机会与压力并存，宜先固本"],
       interpretationTags: ["财重身弱"],
     });
   }
 
-  if (dm.strengthLevel === "strong" && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 1.5) {
+  if (dm.strengthLevel === "strong" && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 1.5 && exposedGods.has("正财")) {
     add({
       patternName: "身强财旺倾向",
-      confidence: 68,
-      evidence: ["日主能担财且财星不弱"],
+      confidence: 62,
+      evidence: ["日主能担财且财星透出"],
       cautions: ["宜务实理财，忌贪快"],
       interpretationTags: ["身强财旺"],
     });
@@ -142,31 +160,34 @@ export function analyzePatterns(algo: PatternAlgoInput): {
     });
   }
 
-  if (dm.strengthLevel === "weak" && (tg.counts["七杀"] ?? 0) > 2) {
+  const supportCount = dm.supportFactors.length;
+  const extremeWeak = dm.strengthLevel === "weak" && dm.strengthScore <= 28 && supportCount <= 1;
+
+  if (extremeWeak && (tg.counts["七杀"] ?? 0) > 3 && monthMainGod === "七杀") {
     add({
       patternName: "从杀倾向",
-      confidence: 55,
-      evidence: ["杀重身轻"],
+      confidence: 50,
+      evidence: ["杀重身轻且月令见杀", "从格条件仍需专业复核"],
       cautions: ["仅作倾向参考，非绝对从格"],
       interpretationTags: ["从杀倾向"],
     });
   }
 
-  if (dm.strengthLevel === "weak" && (tg.counts["食神"] ?? 0) + (tg.counts["伤官"] ?? 0) > 2) {
+  if (extremeWeak && (tg.counts["食神"] ?? 0) + (tg.counts["伤官"] ?? 0) > 3 && (monthMainGod === "食神" || monthMainGod === "伤官")) {
     add({
       patternName: "从儿倾向",
-      confidence: 55,
-      evidence: ["食伤重而日主弱"],
+      confidence: 50,
+      evidence: ["食伤重而日主弱且月令支持", "从格条件仍需专业复核"],
       cautions: ["宜以才华输出为主轴"],
       interpretationTags: ["从儿倾向"],
     });
   }
 
-  if (dm.strengthLevel === "weak" && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 2.5) {
+  if (extremeWeak && (tg.counts["正财"] ?? 0) + (tg.counts["偏财"] ?? 0) > 3.5 && (monthMainGod === "正财" || monthMainGod === "偏财")) {
     add({
       patternName: "从财倾向",
-      confidence: 55,
-      evidence: ["财旺身轻"],
+      confidence: 50,
+      evidence: ["财旺身轻且月令支持", "从格条件仍需专业复核"],
       cautions: ["资源导向强，宜量力而行"],
       interpretationTags: ["从财倾向"],
     });
@@ -174,11 +195,14 @@ export function analyzePatterns(algo: PatternAlgoInput): {
 
   if (!tendencies.length) {
     add({
-      patternName: "中和杂气倾向",
-      confidence: 50,
-      evidence: [`主要十神为${top}${second ? `与${second}` : ""}`],
-      cautions: ["格局不极端，发展看大运触发"],
-      interpretationTags: ["中和"],
+      patternName: "格局证据不足，暂不定格",
+      confidence: 35,
+      evidence: [
+        `月支${monthBranch}主气为${monthMainGod ?? "未能确定"}`,
+        `主要十神为${top}${second ? `与${second}` : ""}，但月令/透干证据不足`,
+      ],
+      cautions: ["格局为倾向分析，未作专业定格。"],
+      interpretationTags: ["不定格"],
     });
   }
 
@@ -186,11 +210,11 @@ export function analyzePatterns(algo: PatternAlgoInput): {
     tendencies: tendencies.slice(0, 8),
     step: {
       step: "patterns",
-      title: "格局初判",
+      title: "格局倾向分析",
       input: { dayMaster: dm.dayMaster },
-      method: "基于十神结构、日主强弱、神煞的 patternTendencies",
+      method: "基于月令主气、透干、十神结构、日主强弱与神煞辅助的 patternTendencies",
       result: { count: tendencies.length },
-      notes: ["第一版输出倾向而非绝对格局定论"],
+      notes: ["格局为倾向分析，未作专业定格。"],
     },
   };
 }

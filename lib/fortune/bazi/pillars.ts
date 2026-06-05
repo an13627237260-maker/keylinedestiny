@@ -21,6 +21,7 @@ import {
   getEffectiveBaziYear,
   getLiChun,
   getMonthBranchIndex,
+  type SolarTerm,
   type SolarTermContext,
 } from "./solarTerms";
 import type { BaziOptions } from "../shared/validation";
@@ -154,6 +155,52 @@ export function getMonthPillar(
       },
       notes: [`当前处于 ${boundaryTerm.name} 之后，对应 ${monthBranch}月`],
     },
+  };
+}
+
+export interface TransitMonthPillarResult {
+  pillar: Pillar;
+  monthBranch: EarthlyBranch;
+  monthStem: HeavenlyStem;
+  boundaryTerm: string;
+  boundaryAt: string;
+  nextBoundary: string | null;
+  nextBoundaryAt: string | null;
+  solarMonthIndex: number;
+  evidence: string[];
+}
+
+export function getTransitMonthPillarBySolarTerm(
+  dateTime: DateTime,
+  yearStem: HeavenlyStem,
+  timezone: string,
+  solarTermContext?: SolarTermContext,
+): TransitMonthPillarResult {
+  const { monthIndex, boundaryTerm, nextBoundary } = getMonthBranchIndex(
+    dateTime,
+    timezone,
+    solarTermContext,
+  );
+  const monthBranch = MONTH_BRANCHES[monthIndex];
+  const yinMonthStem = YEAR_STEM_TO_YIN_MONTH_STEM[yearStem];
+  const monthStem = advanceStem(yinMonthStem, monthIndex);
+  const pillar = pillarFromStemBranch(monthStem, monthBranch);
+  const next = nextBoundary as SolarTerm | null;
+
+  return {
+    pillar,
+    monthBranch,
+    monthStem,
+    boundaryTerm: boundaryTerm.name,
+    boundaryAt: boundaryTerm.dateTime.toISO() ?? "",
+    nextBoundary: next?.name ?? null,
+    nextBoundaryAt: next?.dateTime.toISO() ?? null,
+    solarMonthIndex: monthIndex,
+    evidence: [
+      `流月以节气为界，当前位于${boundaryTerm.name}之后。`,
+      `${boundaryTerm.name}起${monthBranch}月，月干由流年年干${yearStem}按五虎遁推得${monthStem}。`,
+      next ? `下一流月边界为${next.name}。` : "未找到下一流月边界。",
+    ],
   };
 }
 

@@ -1,4 +1,7 @@
+import { DateTime } from "luxon";
 import type { LuckPeriod } from "./types";
+
+const TIMEZONE = "Asia/Shanghai";
 
 export interface LuckPeriodRange {
   period: LuckPeriod;
@@ -10,24 +13,27 @@ export interface LuckPeriodRange {
 }
 
 function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return DateTime.fromJSDate(d).setZone(TIMEZONE).startOf("day").toJSDate();
 }
 
 function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return startOfDay(r);
+  return DateTime.fromJSDate(d)
+    .setZone(TIMEZONE)
+    .plus({ days: n })
+    .startOf("day")
+    .toJSDate();
 }
 
 function addMonths(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth() + n, 1);
+  return DateTime.fromJSDate(d)
+    .setZone(TIMEZONE)
+    .plus({ months: n })
+    .startOf("month")
+    .toJSDate();
 }
 
 export function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return DateTime.fromJSDate(d).setZone(TIMEZONE).toFormat("yyyy-MM-dd");
 }
 
 function enumerateDays(start: Date, end: Date): Date[] {
@@ -41,26 +47,25 @@ function enumerateDays(start: Date, end: Date): Date[] {
 }
 
 function getWeekRange(date: Date, offsetWeeks = 0): { start: Date; end: Date } {
-  const d = addDays(date, offsetWeeks * 7);
-  const day = d.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const start = addDays(d, mondayOffset);
+  const d = DateTime.fromJSDate(addDays(date, offsetWeeks * 7)).setZone(TIMEZONE);
+  const start = d.minus({ days: d.weekday - 1 }).startOf("day").toJSDate();
   const end = addDays(start, 6);
   return { start, end };
 }
 
 function getMonthRange(date: Date, offsetMonths = 0): { start: Date; end: Date } {
-  const d = addMonths(date, offsetMonths);
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return { start: startOfDay(start), end: startOfDay(end) };
+  const d = DateTime.fromJSDate(addMonths(date, offsetMonths)).setZone(TIMEZONE);
+  return {
+    start: d.startOf("month").toJSDate(),
+    end: d.endOf("month").startOf("day").toJSDate(),
+  };
 }
 
 function getYearRange(date: Date, offsetYears = 0): { start: Date; end: Date } {
-  const y = date.getFullYear() + offsetYears;
+  const y = DateTime.fromJSDate(date).setZone(TIMEZONE).year + offsetYears;
   return {
-    start: new Date(y, 0, 1),
-    end: new Date(y, 11, 31),
+    start: DateTime.fromObject({ year: y, month: 1, day: 1 }, { zone: TIMEZONE }).toJSDate(),
+    end: DateTime.fromObject({ year: y, month: 12, day: 31 }, { zone: TIMEZONE }).toJSDate(),
   };
 }
 
@@ -85,51 +90,52 @@ function buildLabel(
     if (offset === 0) return "本月";
     if (offset === -1) return "上月";
     if (offset === 1) return "下月";
-    return `${start.getFullYear()}年${start.getMonth() + 1}月`;
+    const dt = DateTime.fromJSDate(start).setZone(TIMEZONE);
+    return `${dt.year}年${dt.month}月`;
   }
   if (offset === 0) return "今年";
   if (offset === -1) return "去年";
   if (offset === 1) return "明年";
-  return `${start.getFullYear()}年`;
+  return `${DateTime.fromJSDate(start).setZone(TIMEZONE).year}年`;
 }
 
 /** 年运采样：每月 15 日 + 年初年末节点 */
 function yearSampleDates(start: Date, end: Date): Date[] {
-  const y = start.getFullYear();
+  const y = DateTime.fromJSDate(start).setZone(TIMEZONE).year;
   const samples = [
-    new Date(y, 0, 1),
-    new Date(y, 0, 15),
-    new Date(y, 1, 15),
-    new Date(y, 2, 15),
-    new Date(y, 3, 15),
-    new Date(y, 4, 15),
-    new Date(y, 5, 15),
-    new Date(y, 6, 15),
-    new Date(y, 7, 15),
-    new Date(y, 8, 15),
-    new Date(y, 9, 15),
-    new Date(y, 10, 15),
-    new Date(y, 11, 15),
-    new Date(y, 11, 31),
+    [1, 1],
+    [1, 15],
+    [2, 15],
+    [3, 15],
+    [4, 15],
+    [5, 15],
+    [6, 15],
+    [7, 15],
+    [8, 15],
+    [9, 15],
+    [10, 15],
+    [11, 15],
+    [12, 15],
+    [12, 31],
   ];
-  return samples.map(startOfDay);
+  return samples.map(([month, day]) =>
+    DateTime.fromObject({ year: y, month, day }, { zone: TIMEZONE }).toJSDate(),
+  );
 }
 
 /** 月运采样：月初、上旬、月中、下旬、月末 */
 function monthSampleDates(start: Date, end: Date): Date[] {
-  const y = start.getFullYear();
-  const m = start.getMonth();
-  const last = end.getDate();
+  const startDt = DateTime.fromJSDate(start).setZone(TIMEZONE);
+  const endDt = DateTime.fromJSDate(end).setZone(TIMEZONE);
+  const y = startDt.year;
+  const m = startDt.month;
+  const last = endDt.day;
   const mid = Math.floor((1 + last) / 2);
   const early = Math.max(1, Math.floor(last * 0.25));
   const late = Math.min(last, Math.floor(last * 0.75));
-  return [
-    new Date(y, m, 1),
-    new Date(y, m, early),
-    new Date(y, m, mid),
-    new Date(y, m, late),
-    new Date(y, m, last),
-  ].map(startOfDay);
+  return [1, early, mid, late, last].map((day) =>
+    DateTime.fromObject({ year: y, month: m, day }, { zone: TIMEZONE }).toJSDate(),
+  );
 }
 
 export function resolveLuckPeriodRange(
@@ -169,7 +175,10 @@ export function resolveLuckPeriodRange(
       period,
       startDate: start,
       endDate: end,
-      anchorDate: new Date(start.getFullYear(), start.getMonth(), 15),
+      anchorDate: DateTime.fromJSDate(start)
+        .setZone(TIMEZONE)
+        .set({ day: 15 })
+        .toJSDate(),
       dates: monthSampleDates(start, end),
       label: buildLabel(period, start, end, offset),
     };
@@ -180,7 +189,10 @@ export function resolveLuckPeriodRange(
     period,
     startDate: start,
     endDate: end,
-    anchorDate: new Date(start.getFullYear(), 6, 1),
+    anchorDate: DateTime.fromJSDate(start)
+      .setZone(TIMEZONE)
+      .set({ month: 7, day: 1 })
+      .toJSDate(),
     dates: yearSampleDates(start, end),
     label: buildLabel(period, start, end, offset),
   };

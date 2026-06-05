@@ -57,17 +57,18 @@ describe("branchRelations punishments", () => {
 });
 
 describe("branchRelations 三合与三会", () => {
-  it("申子辰全出现，输出三合水局且 confidence=90", () => {
+  it("申子辰全出现，输出三合水局成局倾向且 confidence=90", () => {
     const { analysis } = analyzeBranchRelations(pillars(["申", "子", "辰", "丑"]));
-    const relation = analysis.meetings.find((m) => m.description === "申子辰三合水局");
+    const relation = analysis.meetings.find((m) => m.description === "申子辰三合水局成局倾向");
     expect(relation?.confidence).toBe(90);
+    expect(relation?.affectedArea.length).toBeGreaterThan(0);
   });
 
   it("申子只输出半合倾向，不写成局", () => {
     const { analysis } = analyzeBranchRelations(pillars(["申", "子", "丑", "寅"]));
     const relation = analysis.meetings.find((m) => m.description.includes("申子半合水势倾向"));
     expect(relation?.confidence).toBe(55);
-    expect(analysis.meetings.some((m) => m.description.includes("三合水局"))).toBe(false);
+    expect(analysis.meetings.some((m) => m.description.includes("三合水局成局"))).toBe(false);
   });
 
   it("申辰只输出拱合倾向", () => {
@@ -75,16 +76,17 @@ describe("branchRelations 三合与三会", () => {
     expect(analysis.meetings.some((m) => m.description.includes("申辰拱合水势倾向"))).toBe(true);
   });
 
-  it("寅卯辰全出现，输出三会木势且 confidence=90", () => {
+  it("寅卯辰全出现，输出三会木势成势且 confidence=90", () => {
     const { analysis } = analyzeBranchRelations(pillars(["寅", "卯", "辰", "丑"]));
-    const relation = analysis.meetings.find((m) => m.description === "寅卯辰三会木势");
+    const relation = analysis.meetings.find((m) => m.description === "寅卯辰三会木势成势");
     expect(relation?.confidence).toBe(90);
+    expect(relation?.affectedArea.length).toBeGreaterThan(0);
   });
 
   it("寅卯只输出半会倾向，不写三会成立", () => {
     const { analysis } = analyzeBranchRelations(pillars(["寅", "卯", "子", "丑"]));
     const relation = analysis.meetings.find((m) => m.description.includes("寅卯半会木势倾向"));
     expect(relation?.confidence).toBe(55);
-    expect(analysis.meetings.some((m) => m.description.includes("三会木势") && !m.description.includes("倾向"))).toBe(false);
+    expect(analysis.meetings.some((m) => m.description.includes("三会木势成势"))).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import {
   buildSolarTermStep,
   checkSolarTermProximityWarnings,
+  getSolarTermPrecisionMeta,
 } from "@/lib/fortune/bazi/solarTerms";
 
 describe("solar term warnings", () => {
@@ -14,6 +15,15 @@ describe("solar term warnings", () => {
     expect(step.result.tableAvailable).toBe(false);
     expect(step.result.sourceType).toBe("approx_algorithm");
     expect(JSON.stringify(step)).toContain("近似算法");
+    expect(JSON.stringify(step.result)).not.toContain('"exact"');
+  });
+
+  it("未内置完整表时 precision=approximate 且 source 不显示 exact", () => {
+    const meta = getSolarTermPrecisionMeta(2026);
+    expect(meta.source).toBe("approx");
+    expect(meta.precision).toBe("approximate");
+    expect(meta.tableAvailable).toBe(false);
+    expect(meta.note).toContain("当前未内置完整表");
   });
 
   it("距离节气 24 小时以内给出边界 warning", () => {
@@ -27,7 +37,7 @@ describe("solar term warnings", () => {
     const warnings = checkSolarTermProximityWarnings(dt, "Asia/Shanghai");
     expect(
       warnings.some((warning) =>
-        warning.includes("出生时间非常接近节气切换，年柱或月柱建议使用精确节气表复核。"),
+        warning.includes("出生时间非常接近节气切换，年柱或月柱建议使用权威天文历节气时刻复核。"),
       ),
     ).toBe(true);
   });

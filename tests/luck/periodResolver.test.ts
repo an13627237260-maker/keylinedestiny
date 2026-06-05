@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolveLuckPeriodRange } from "@/lib/fortune/luck/periodResolver";
+import {
+  formatDate,
+  resolveLuckPeriodRange,
+} from "@/lib/fortune/luck/periodResolver";
 
 describe("periodResolver", () => {
   const base = new Date("2026-06-05");
@@ -13,8 +16,8 @@ describe("periodResolver", () => {
   it("week 为周一到周日共 7 天", () => {
     const r = resolveLuckPeriodRange(base, "week", 0);
     expect(r.dates).toHaveLength(7);
-    expect(r.startDate.getDay()).toBe(1);
-    expect(r.endDate.getDay()).toBe(0);
+    expect(formatDate(r.startDate)).toBe("2026-06-01");
+    expect(formatDate(r.endDate)).toBe("2026-06-07");
   });
 
   it("本周与下周 label 不同", () => {
@@ -27,16 +30,16 @@ describe("periodResolver", () => {
   it("本月与下月范围不同", () => {
     const m0 = resolveLuckPeriodRange(base, "month", 0);
     const m1 = resolveLuckPeriodRange(base, "month", 1);
-    expect(m0.startDate.getMonth()).toBe(5);
-    expect(m1.startDate.getMonth()).toBe(6);
+    expect(formatDate(m0.startDate)).toBe("2026-06-01");
+    expect(formatDate(m1.startDate)).toBe("2026-07-01");
     expect(m0.dates.length).toBeGreaterThanOrEqual(5);
   });
 
   it("今年与去年年份不同", () => {
     const y0 = resolveLuckPeriodRange(base, "year", 0);
     const y1 = resolveLuckPeriodRange(base, "year", -1);
-    expect(y0.startDate.getFullYear()).toBe(2026);
-    expect(y1.startDate.getFullYear()).toBe(2025);
+    expect(formatDate(y0.startDate)).toBe("2026-01-01");
+    expect(formatDate(y1.startDate)).toBe("2025-01-01");
     expect(y0.dates.length).toBeGreaterThan(10);
   });
 });

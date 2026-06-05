@@ -1,6 +1,9 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { calculateLuckCycle } from "@/lib/fortune/bazi/luckCycle";
+import {
+  calculateLuckCycle,
+  calculateLuckStartConversion,
+} from "@/lib/fortune/bazi/luckCycle";
 import { getSexagenary } from "@/lib/fortune/bazi/ganzhi";
 import type { FourPillars } from "@/lib/fortune/bazi/pillars";
 
@@ -18,6 +21,23 @@ function pillarsForYearIndex(yearIndex: number): FourPillars {
 }
 
 describe("luckCycle direction and positioning", () => {
+  it("diffDays=3 时 startAge≈1", () => {
+    const c = calculateLuckStartConversion(3 * 24);
+    expect(c.startAge).toBeCloseTo(1, 1);
+    expect(c.equivalentYears).toBeCloseTo(1, 2);
+    expect(c.equivalentMonths).toBeCloseTo(12, 2);
+  });
+
+  it("diffDays=6 时 startAge≈2", () => {
+    const c = calculateLuckStartConversion(6 * 24);
+    expect(c.startAge).toBeCloseTo(2, 1);
+  });
+
+  it("diffDays=1.5 时 startAge≈0.5", () => {
+    const c = calculateLuckStartConversion(1.5 * 24);
+    expect(c.startAge).toBeCloseTo(0.5, 1);
+  });
+
   it("阳年男顺排", () => {
     const { analysis } = calculateLuckCycle(
       birthDateTime,
@@ -71,7 +91,27 @@ describe("luckCycle direction and positioning", () => {
       1990,
     );
     expect(analysis.startAge).toBeGreaterThanOrEqual(0);
+    expect(analysis.startConversion?.diffHours).toBeGreaterThanOrEqual(0);
     expect(analysis.cycles.every((cycle) => cycle.startAge >= 0)).toBe(true);
+  });
+
+  it("大运从月柱顺逆排", () => {
+    const forward = calculateLuckCycle(
+      birthDateTime,
+      "Asia/Shanghai",
+      "male",
+      pillarsForYearIndex(0),
+      1990,
+    ).analysis;
+    const backward = calculateLuckCycle(
+      birthDateTime,
+      "Asia/Shanghai",
+      "male",
+      pillarsForYearIndex(1),
+      1990,
+    ).analysis;
+    expect(forward.cycles[0].pillar.index).toBe(11);
+    expect(backward.cycles[0].pillar.index).toBe(9);
   });
 
   it("当前大运可根据出生年、起运年龄、当前年份定位", () => {

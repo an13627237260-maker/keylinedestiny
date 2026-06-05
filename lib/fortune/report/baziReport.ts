@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import type { BaziAlgorithmResult } from "../bazi";
 import { generateAllLuckOverviews } from "../luck";
 import {
@@ -10,6 +11,8 @@ import { labelFocusArea, labelStrength } from "../shared/labels";
 import type { FortuneReport, ReportSection, RuleResult } from "../shared/reportTypes";
 import type { BaziInput } from "../shared/validation";
 import { buildReport, joinParagraphs } from "./templateEngine";
+
+const TIMEZONE = "Asia/Shanghai";
 
 function fmtPillars(algo: BaziAlgorithmResult): string {
   const p = algo.pillarStrings;
@@ -275,7 +278,7 @@ function sectionUsefulGods(algo: BaziAlgorithmResult): ReportSection | null {
 function sectionLuckCycle(algo: BaziAlgorithmResult): ReportSection | null {
   const lc = algo.luckCycle;
   const current = lc.cycles.find((c) => {
-    const target = algo.yearlyLuck?.targetYear ?? new Date().getFullYear();
+    const target = algo.yearlyLuck?.targetYear ?? DateTime.now().setZone(TIMEZONE).year;
     return target >= c.startYear && target <= c.endYear;
   });
   const evidence = [

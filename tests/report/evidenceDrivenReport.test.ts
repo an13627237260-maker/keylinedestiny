@@ -14,6 +14,22 @@ const INPUT = {
 };
 
 describe("evidence driven bazi report", () => {
+  it("每个 ruleResult 必须带 evidence", () => {
+    const { algorithm_result } = computeBazi(INPUT);
+    const rules = runBaziRules(algorithm_result, INPUT.focusArea);
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) {
+      expect(rule.evidence.length).toBeGreaterThan(0);
+      for (const evidence of rule.evidence) {
+        expect(evidence.source).toBeTruthy();
+        expect(evidence.category).toBeTruthy();
+        expect(evidence.weight).toBeGreaterThan(0);
+        expect(evidence.title).toBeTruthy();
+        expect(evidence.detail).toBeTruthy();
+      }
+    }
+  });
+
   it("每个 report section 必须有依据", () => {
     const { algorithm_result } = computeBazi(INPUT);
     const rules = runBaziRules(algorithm_result, INPUT.focusArea);
