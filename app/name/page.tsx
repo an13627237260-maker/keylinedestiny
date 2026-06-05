@@ -35,10 +35,22 @@ export default function NamePage() {
         name: fd.get("name"),
         script: fd.get("script"),
       });
-      const { algorithm_result, calculation_steps, warnings } = analyzeName(
+      const { analysis, calculation_steps, warnings } = analyzeName(
         input.name,
-        input.script,
+        input.script as "simplified" | "traditional",
       );
+      const algorithm_result =
+        analysis.status === "success"
+          ? {
+              ...analysis.result,
+              fiveGrid: analysis.result.fiveGrid,
+              threeTalent: analysis.result.threeTalent,
+            }
+          : {
+              missingChars:
+                analysis.status === "needs_strokes" ? analysis.missingChars : [],
+              status: analysis.status,
+            };
       const report = generateNameReport(
         algorithm_result as unknown as Parameters<typeof generateNameReport>[0],
       );

@@ -14,11 +14,17 @@ export const baziInputSchema = z
     gender: z.enum(["male", "female", "unknown"]),
     birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     birthTime: z.string().regex(/^\d{2}:\d{2}$/),
+    province: z.string().optional(),
+    city: z.string().optional(),
     birthPlace: z.string().optional(),
+    birthPlaceNote: z.string().max(200).optional(),
+    locationUnknown: z.boolean().optional(),
     longitude: z.number().min(-180).max(180).optional(),
     latitude: z.number().min(-90).max(90).optional(),
+    manualLongitude: z.number().min(-180).max(180).optional(),
+    manualLatitude: z.number().min(-90).max(90).optional(),
     timezone: z.string().min(1),
-    useTrueSolarTime: z.boolean().default(false),
+    useTrueSolarTime: z.boolean().default(true),
     focusArea: z
       .enum(["overall", "love", "career", "wealth", "study", "health"])
       .default("overall"),
@@ -32,13 +38,6 @@ export const baziInputSchema = z
         code: "custom",
         message: `出生年份必须在 ${CALENDAR_MIN_YEAR}-${CALENDAR_MAX_YEAR} 之间`,
         path: ["birthDate"],
-      });
-    }
-    if (data.useTrueSolarTime && data.longitude === undefined) {
-      ctx.addIssue({
-        code: "custom",
-        message: "启用真太阳时必须提供经度 longitude",
-        path: ["longitude"],
       });
     }
   });
@@ -63,13 +62,17 @@ export const tarotInputSchema = z.object({
 export const zodiacInputSchema = z.object({
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   zodiacSign: z.string().optional(),
-  period: z.enum(["daily", "weekly", "monthly"]).default("daily"),
+  period: z
+    .enum(["day", "week", "month", "year", "daily", "weekly", "monthly"])
+    .default("day"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export const nameInputSchema = z.object({
   name: z.string().min(1).max(20),
-  script: z.enum(["simplified", "traditional"]).default("simplified"),
+  script: z
+    .enum(["simplified", "traditional", "kangxi"])
+    .default("simplified"),
   gender: z.enum(["male", "female", "unknown"]).default("unknown"),
 });
 

@@ -1,20 +1,14 @@
 import type { CalculationStep } from "../shared/types";
 import { getStrokeCount } from "./strokes";
+import type {
+  CustomStrokeEntry,
+  FiveGrid,
+  NameAnalysisResult,
+  StrokeMode,
+  ThreeTalent,
+} from "./types";
 
-export interface FiveGrid {
-  tianGe: number;
-  renGe: number;
-  diGe: number;
-  waiGe: number;
-  zongGe: number;
-}
-
-export interface ThreeTalent {
-  tian: string;
-  ren: string;
-  di: string;
-  config: string;
-}
+export type { FiveGrid, ThreeTalent };
 
 function strokeToElement(n: number): string {
   const mod = n % 10;
@@ -25,33 +19,54 @@ function strokeToElement(n: number): string {
   return "水";
 }
 
+const LUCKY_NUMBERS = new Set([
+  1, 3, 5, 6, 7, 8, 11, 13, 15, 16, 17, 18, 21, 23, 24, 25, 31, 32, 33, 35,
+  37, 39, 41, 45, 47, 48, 52, 57, 61, 63, 65, 67, 68, 81,
+]);
+
+function gridLuckLabel(n: number): string {
+  if (LUCKY_NUMBERS.has(n)) return "偏吉";
+  if (n % 10 === 4 || n % 10 === 9) return "宜留意";
+  return "平稳";
+}
+
+function gridExplain(name: string, n: number): string {
+  const label = gridLuckLabel(n);
+  return `${name}${n}画，${label}，仅作姓名学简化参考`;
+}
+
 export function calculateFiveGrid(
   surname: string,
   givenName: string,
-  script: "simplified" | "traditional",
+  mode: StrokeMode,
+  customMap?: Record<string, CustomStrokeEntry>,
 ): {
   fiveGrid: FiveGrid | null;
   missingChars: string[];
   strokes: number[];
+  charStrokes: Array<{ char: string; strokes: number; warning?: string }>;
   warnings: string[];
 } {
   const chars = [...surname, ...givenName];
   const strokes: number[] = [];
+  const charStrokes: Array<{ char: string; strokes: number; warning?: string }> = [];
   const missingChars: string[] = [];
   const warnings: string[] = [];
 
   for (const char of chars) {
-    const { stroke, warning } = getStrokeCount(char, script);
+    const { stroke, warning, source } = getStrokeCount(char, mode, customMap);
     if (stroke === null) {
       missingChars.push(char);
     } else {
       strokes.push(stroke);
-      if (warning) warnings.push(`${char}: ${warning}`);
+      charStrokes.push({ char, strokes: stroke, warning });
+      if (warning) warnings.push(warning);
+      if (source === "custom") warnings.push(`${char}：使用手动补充笔画`);
     }
   }
 
   if (missingChars.length > 0 || strokes.length !== chars.length) {
-    return { fiveGrid: null, missingChars, strokes, warnings };
+    return { fiveGrid: null, missingChars, strokes, charStrokes, warnings };
   }
 
   const sLen = [...surname].length;
@@ -82,6 +97,7 @@ export function calculateFiveGrid(
     fiveGrid: { tianGe, renGe, diGe, waiGe, zongGe },
     missingChars,
     strokes,
+    charStrokes,
     warnings,
   };
 }
@@ -90,12 +106,7 @@ export function analyzeThreeTalent(fiveGrid: FiveGrid): ThreeTalent {
   const tian = strokeToElement(fiveGrid.tianGe);
   const ren = strokeToElement(fiveGrid.renGe);
   const di = strokeToElement(fiveGrid.diGe);
-  return {
-    tian,
-    ren,
-    di,
-    config: `${tian}${ren}${di}`,
-  };
+  return { tian, ren, di, config: `${tian}${ren}${di}` };
 }
 
 export function scoreName(fiveGrid: FiveGrid): number {
@@ -106,85 +117,205 @@ export function scoreName(fiveGrid: FiveGrid): number {
     fiveGrid.waiGe,
     fiveGrid.zongGe,
   ];
-  let score = 60;
+  let score = 62;
   for (const n of nums) {
-    const mod = n % 10;
-    if ([1, 3, 5, 6, 7, 8, 11, 13, 15, 16, 17, 18, 21, 23, 24, 25, 31, 32, 33, 35, 37, 39, 41, 45, 47, 48, 52, 57, 61, 63, 65, 67, 68, 81].includes(n)) {
-      score += 4;
-    } else if (mod === 4 || mod === 9) {
-      score -= 2;
-    }
+    if (LUCKY_NUMBERS.has(n)) score += 4;
+    else if (n % 10 === 4 || n % 10 === 9) score -= 2;
+    else score += 1;
   }
-  return Math.max(40, Math.min(95, score));
+  return Math.max(55, Math.min(92, score));
+}
+
+function buildInsights(
+  fiveGrid: FiveGrid,
+  threeTalent: ThreeTalent,
+  nameScore: number,
+): {
+  strengths: string[];
+  cautions: string[];
+  suggestions: string[];
+  personalityHints: string[];
+  careerHints: string[];
+  relationshipHints: string[];
+} {
+  return {
+    strengths: [
+      `人格${fiveGrid.renGe}画（${gridLuckLabel(fiveGrid.renGe)}），主性格与自我表达方式`,
+      `三才${threeTalent.config}，五行搭配有可参考的节奏感`,
+      `综合评分约 ${nameScore} 分，整体处于常见姓名区间`,
+    ],
+    cautions: [
+      gridLuckLabel(fiveGrid.waiGe) === "宜留意"
+        ? `外格${fiveGrid.waiGe}画，人际表达宜更圆融`
+        : "不同姓名学流派对吉凶判断有差异，勿作绝对结论",
+      "五格为简化模型，不能替代个人努力与选择",
+      "笔画模式不同可能导致结果略有差异",
+    ],
+    suggestions: [
+      "可把姓名看作自我认同符号，重点在行为与习惯的积累",
+      "若关注事业，可结合专业能力与学习节奏综合规划",
+      "人际方面，表达清晰比追求完美笔画更重要",
+      "定期复盘目标，比纠结某一格吉凶更有实际帮助",
+      "姓名学适合作为文化参考，不宜过度焦虑",
+    ],
+    personalityHints: [
+      `人格格数 ${fiveGrid.renGe}，${gridExplain("人格", fiveGrid.renGe)}`,
+      `天格 ${fiveGrid.tianGe} 反映早年环境与家族影响倾向`,
+      `地格 ${fiveGrid.diGe} 与内在安全感、基础习惯相关`,
+    ],
+    careerHints: [
+      `总格 ${fiveGrid.zongGe} 与长期发展方向的整体节奏相关`,
+      "事业成长更依赖技能、经验与机遇，姓名仅作辅助参考",
+    ],
+    relationshipHints: [
+      `外格 ${fiveGrid.waiGe} 与人际互动风格有一定关联`,
+      "感情相处重在沟通与尊重，不宜仅凭姓名判断缘分",
+    ],
+  };
 }
 
 export function analyzeName(
   fullName: string,
-  script: "simplified" | "traditional",
+  mode: StrokeMode = "simplified",
+  customMap?: Record<string, CustomStrokeEntry>,
 ): {
-  algorithm_result: Record<string, unknown>;
+  analysis: NameAnalysisResult;
   calculation_steps: CalculationStep[];
   warnings: string[];
 } {
   const trimmed = fullName.trim();
+  if (!trimmed || trimmed.length < 2) {
+    return {
+      analysis: {
+        status: "error",
+        error: { code: "INVALID_NAME", message: "请输入至少两个字的姓名" },
+      },
+      calculation_steps: [],
+      warnings: [],
+    };
+  }
+
   const surname = trimmed[0] ?? "";
   const givenName = trimmed.slice(1);
-  const { fiveGrid, missingChars, strokes, warnings } = calculateFiveGrid(
-    surname,
-    givenName,
-    script,
-  );
+  const { fiveGrid, missingChars, strokes, charStrokes, warnings } =
+    calculateFiveGrid(surname, givenName, mode, customMap);
 
   warnings.push("采用五格剖象法简化模型，不同流派可能有差异");
 
-  if (!fiveGrid) {
+  const modeLabel =
+    mode === "simplified" ? "简体笔画" : mode === "traditional" ? "繁体笔画" : "康熙笔画";
+
+  if (missingChars.length > 0) {
     return {
-      algorithm_result: {
-        name: trimmed,
-        script,
+      analysis: {
+        status: "needs_strokes",
         missingChars,
-        method: "五格剖象法简化模型",
+        partialResult: {
+          name: trimmed,
+          mode,
+          knownStrokes: charStrokes.map((c) => ({
+            char: c.char,
+            strokes: c.strokes,
+          })),
+        },
+        message: "部分汉字缺少笔画数据，请补充后继续分析。",
       },
       calculation_steps: [
         {
           step: "name_strokes",
           title: "姓名笔画",
-          input: { name: trimmed, script },
+          input: { name: trimmed, mode: modeLabel },
           method: "五格剖象法",
-          result: { missingChars, strokes },
-          notes: ["缺少笔画数据的字无法计算，不会猜测"],
+          result: { missingChars, knownStrokes: charStrokes },
+          notes: ["部分汉字暂未收录，可手动补充笔画"],
         },
       ],
       warnings,
     };
   }
 
-  const threeTalent = analyzeThreeTalent(fiveGrid);
-  const nameScore = scoreName(fiveGrid);
+  const threeTalent = analyzeThreeTalent(fiveGrid!);
+  const nameScore = scoreName(fiveGrid!);
+  const insights = buildInsights(fiveGrid!, threeTalent, nameScore);
 
   return {
-    algorithm_result: {
-      name: trimmed,
-      script,
-      strokes,
-      fiveGrid,
-      threeTalent,
-      nameScore,
-      personalityHints: [`人格${fiveGrid.renGe}画，三才${threeTalent.config}`],
-      careerHints: ["姓名学仅提供倾向参考，需结合个人努力"],
-      relationshipHints: ["外格与总格可观察人际表达风格"],
-      method: "五格剖象法简化模型",
+    analysis: {
+      status: "success",
+      missingChars: [],
+      result: {
+        name: trimmed,
+        mode,
+        strokes,
+        charStrokes,
+        fiveGrid: fiveGrid!,
+        threeTalent,
+        nameScore,
+        method: "五格剖象法简化模型",
+        ...insights,
+      },
     },
     calculation_steps: [
       {
         step: "name_strokes",
         title: "姓名笔画与五格",
-        input: { name: trimmed, script },
+        input: { name: trimmed, mode: modeLabel },
         method: "天格/人格/地格/外格/总格",
-        result: { fiveGrid, threeTalent, nameScore },
+        result: {
+          charStrokes,
+          fiveGrid,
+          threeTalent,
+          nameScore,
+        },
         notes: warnings,
       },
     ],
+    warnings,
+  };
+}
+
+/** @deprecated 兼容旧调用，请使用 analyzeName 返回的 analysis */
+export function analyzeNameLegacy(
+  fullName: string,
+  script: "simplified" | "traditional",
+  customMap?: Record<string, CustomStrokeEntry>,
+) {
+  const { analysis, calculation_steps, warnings } = analyzeName(
+    fullName,
+    script,
+    customMap,
+  );
+  if (analysis.status === "success") {
+    return {
+      algorithm_result: {
+        name: analysis.result.name,
+        script: analysis.result.mode,
+        strokes: analysis.result.strokes,
+        charStrokes: analysis.result.charStrokes,
+        fiveGrid: analysis.result.fiveGrid,
+        threeTalent: analysis.result.threeTalent,
+        nameScore: analysis.result.nameScore,
+        strengths: analysis.result.strengths,
+        cautions: analysis.result.cautions,
+        suggestions: analysis.result.suggestions,
+        personalityHints: analysis.result.personalityHints,
+        careerHints: analysis.result.careerHints,
+        relationshipHints: analysis.result.relationshipHints,
+        method: analysis.result.method,
+      },
+      calculation_steps,
+      warnings,
+    };
+  }
+  return {
+    algorithm_result: {
+      name: fullName.trim(),
+      script,
+      missingChars: analysis.status === "needs_strokes" ? analysis.missingChars : [],
+      status: analysis.status,
+      message: analysis.status === "needs_strokes" ? analysis.message : undefined,
+      method: "五格剖象法简化模型",
+    },
+    calculation_steps,
     warnings,
   };
 }

@@ -124,7 +124,7 @@ describe("运势评分 luckScoring", () => {
     expect(sum).toBeCloseTo(1, 5);
   });
 
-  it("综合分等于分项加权结果", () => {
+  it("综合分基于分项加权（含地域辅助调整上限±3）", () => {
     const bazi = getBazi("career");
     const overview = generateLuckOverview({
       baziResult: bazi,
@@ -138,6 +138,7 @@ describe("运势评分 luckScoring", () => {
       const s = overview.scores.find((x) => x.category === cat)!.score;
       expected += s * weights[cat];
     }
-    expect(overview.overallScore).toBe(clampScore(expected));
+    const base = clampScore(expected);
+    expect(Math.abs(overview.overallScore - base)).toBeLessThanOrEqual(3);
   });
 });

@@ -7,6 +7,7 @@ import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 import type { BaziAlgorithmResult } from "@/lib/fortune/bazi";
 import { LuckOverviewCard } from "@/components/luck/LuckOverviewCard";
 import { BaziOverviewCard } from "./BaziOverviewCard";
+import { LocationInfluenceCard } from "./LocationInfluenceCard";
 import { CoreMetricsRow } from "./CoreMetricsRow";
 import { ElementDistributionCard } from "./ElementDistributionCard";
 import { DayMasterCard } from "./DayMasterCard";
@@ -39,6 +40,9 @@ export function BaziResultPanels({
     >
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <BaziOverviewCard algo={algo} />
+      </motion.div>
+      <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
+        <LocationInfluenceCard algo={algo} />
       </motion.div>
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <LuckOverviewCard baziResult={algo} focusArea={focusArea} />

@@ -1,189 +1,69 @@
-/** 常用汉字笔画（五格剖象简化库，可扩展） */
-export const STROKE_MAP: Record<string, number> = {
-  王: 4,
-  李: 7,
-  张: 11,
-  刘: 15,
-  陈: 16,
-  杨: 13,
-  赵: 14,
-  黄: 12,
-  周: 8,
-  吴: 7,
-  徐: 10,
-  孙: 10,
-  胡: 11,
-  朱: 6,
-  高: 10,
-  林: 8,
-  何: 7,
-  郭: 15,
-  马: 10,
-  罗: 19,
-  梁: 11,
-  宋: 7,
-  郑: 19,
-  谢: 17,
-  韩: 17,
-  唐: 10,
-  冯: 12,
-  于: 3,
-  董: 15,
-  萧: 16,
-  程: 12,
-  曹: 11,
-  袁: 10,
-  邓: 19,
-  许: 11,
-  傅: 12,
-  沈: 7,
-  曾: 12,
-  彭: 12,
-  吕: 6,
-  苏: 22,
-  卢: 16,
-  蒋: 17,
-  蔡: 17,
-  贾: 13,
-  丁: 2,
-  魏: 18,
-  薛: 19,
-  叶: 15,
-  阎: 16,
-  余: 7,
-  潘: 16,
-  杜: 7,
-  戴: 18,
-  夏: 10,
-  钟: 17,
-  汪: 8,
-  田: 5,
-  任: 6,
-  姜: 9,
-  范: 15,
-  方: 4,
-  石: 5,
-  姚: 9,
-  谭: 19,
-  廖: 14,
-  邹: 17,
-  熊: 14,
-  金: 8,
-  陆: 16,
-  郝: 14,
-  孔: 4,
-  白: 5,
-  崔: 11,
-  康: 11,
-  毛: 4,
-  邱: 12,
-  秦: 10,
-  江: 6,
-  史: 5,
-  顾: 21,
-  侯: 9,
-  邵: 12,
-  孟: 8,
-  龙: 16,
-  万: 15,
-  段: 9,
-  雷: 13,
-  钱: 16,
-  汤: 13,
-  尹: 4,
-  黎: 15,
-  易: 8,
-  常: 11,
-  武: 8,
-  乔: 12,
-  贺: 12,
-  赖: 16,
-  龚: 22,
-  文: 4,
-  明: 8,
-  华: 14,
-  美: 9,
-  丽: 19,
-  静: 16,
-  伟: 11,
-  强: 12,
-  芳: 10,
-  娜: 10,
-  敏: 11,
-  磊: 15,
-  军: 9,
-  洋: 9,
-  勇: 9,
-  艳: 24,
-  杰: 12,
-  涛: 18,
-  超: 12,
-  秀: 7,
-  英: 11,
-  慧: 15,
-  婷: 12,
-  雪: 11,
-  梅: 11,
-  兰: 23,
-  红: 9,
-  云: 12,
-  霞: 17,
-  春: 9,
-  秋: 9,
-  冬: 5,
-  天: 4,
-  地: 6,
-  人: 2,
-  心: 4,
-  志: 7,
-  成: 7,
-  建: 9,
-  国: 11,
-  家: 10,
-  安: 6,
-  乐: 15,
-  福: 14,
-  寿: 14,
-  喜: 12,
-  德: 15,
-  仁: 4,
-  义: 13,
-  礼: 18,
-  智: 12,
-  信: 9,
-  小: 3,
-  大: 3,
-  中: 4,
-  正: 5,
-  平: 5,
-  和: 8,
-  新: 13,
-  永: 5,
-  世: 5,
-  子: 3,
-  一: 1,
-  二: 2,
-  三: 3,
-  四: 5,
-  五: 4,
-  六: 4,
-  七: 2,
-  八: 2,
-  九: 2,
-  十: 2,
-};
+import { STROKE_BULK } from "./strokeBulk";
+import type { CustomStrokeEntry, StrokeEntry, StrokeMode } from "./types";
+
+export type { StrokeEntry };
+
+export const STROKE_MAP: Record<string, StrokeEntry> = { ...STROKE_BULK };
+
+export interface StrokeLookupResult {
+  stroke: number | null;
+  warning?: string;
+  source: "custom" | "builtin" | "traditionalChar" | "none";
+}
 
 export function getStrokeCount(
   char: string,
-  script: "simplified" | "traditional",
-): { stroke: number | null; warning?: string } {
-  if (script === "traditional") {
+  mode: StrokeMode,
+  customMap?: Record<string, CustomStrokeEntry>,
+): StrokeLookupResult {
+  const custom = customMap?.[char];
+  if (custom) {
+    if (mode === "kangxi" && custom.kangxi != null) {
+      return { stroke: custom.kangxi, source: "custom" };
+    }
+    if (mode === "traditional" && custom.traditional != null) {
+      return { stroke: custom.traditional, source: "custom" };
+    }
+    if (custom.simplified != null) {
+      return { stroke: custom.simplified, source: "custom" };
+    }
+  }
+
+  const entry = STROKE_MAP[char];
+  if (!entry) {
+    return { stroke: null, source: "none" };
+  }
+
+  if (mode === "kangxi") {
+    const k = entry.kangxi ?? entry.traditional ?? entry.simplified;
     return {
-      stroke: STROKE_MAP[char] ?? null,
-      warning: STROKE_MAP[char]
-        ? "繁体笔画可能与简体库不同，当前使用统一字库近似"
-        : undefined,
+      stroke: k,
+      source: "builtin",
+      warning:
+        entry.kangxi == null
+          ? `${char}：暂无康熙笔画，暂用繁体/简体笔画`
+          : undefined,
     };
   }
-  return { stroke: STROKE_MAP[char] ?? null };
+
+  if (mode === "traditional") {
+    if (entry.traditional != null) {
+      return { stroke: entry.traditional, source: "builtin" };
+    }
+    return {
+      stroke: entry.simplified,
+      source: "builtin",
+      warning: `${char}：暂无繁体笔画，暂用简体笔画`,
+    };
+  }
+
+  return { stroke: entry.simplified, source: "builtin" };
+}
+
+export function resolveCharForMode(char: string, mode: StrokeMode): string {
+  if (mode === "traditional" || mode === "kangxi") {
+    const entry = STROKE_MAP[char];
+    if (entry?.traditionalChar) return entry.traditionalChar;
+  }
+  return char;
 }

@@ -1,9 +1,14 @@
-import { DateTime } from "luxon";
 import { DISCLAIMER } from "../shared/constants";
 import type { CalculationStep } from "../shared/types";
 import { parseBirthDateTime, validateTimezone } from "../shared/time";
 import type { BaziInput } from "../shared/validation";
 import { baziOptionsSchema } from "../shared/validation";
+import {
+  buildLocationResolvedStep,
+  buildRegionElementNote,
+  resolveBirthLocation,
+} from "../location/locationResolver";
+import type { LocationInfluence } from "../location/types";
 import { analyzeBranchRelations } from "./branchRelations";
 import { analyzeDayMasterStrength } from "./dayMasterStrength";
 import { analyzeFiveElements } from "./fiveElements";
@@ -49,6 +54,7 @@ export interface BaziAlgorithmResult {
   luckCycle: ReturnType<typeof calculateLuckCycle>["analysis"];
   yearlyLuck?: ReturnType<typeof analyzeYearlyLuck>["analysis"];
   monthlyLuck?: ReturnType<typeof analyzeMonthlyLuck>["months"];
+  locationInfluence?: LocationInfluence;
 }
 
 export function computeBazi(input: BaziInput): {
@@ -59,32 +65,84 @@ export function computeBazi(input: BaziInput): {
   validateTimezone(input.timezone);
   const options = baziOptionsSchema.parse(input.options ?? {});
 
-  let dateTime = parseBirthDateTime(
-    input.birthDate,
-    input.birthTime,
-    input.timezone,
-  );
+  const resolved = resolveBirthLocation({
+    province: input.province,
+    city: input.city,
+    birthPlace: input.birthPlace,
+    birthPlaceNote: input.birthPlaceNote,
+    locationUnknown: input.locationUnknown,
+    longitude: input.longitude,
+    latitude: input.latitude,
+    manualLongitude: input.manualLongitude,
+    manualLatitude: input.manualLatitude,
+  });
 
-  const steps: CalculationStep[] = [];
+  const timezone = resolved.timezone || input.timezone;
+  validateTimezone(timezone);
+
+  const steps: CalculationStep[] = [buildLocationResolvedStep(resolved)];
   const warnings: string[] = [SOLAR_TERM_ACCURACY_NOTE];
 
-  if (input.useTrueSolarTime && input.longitude !== undefined) {
-    const tst = calculateTrueSolarTime(
-      dateTime,
-      input.timezone,
-      input.longitude,
-      options.useEquationOfTime,
-    );
-    dateTime = tst.adjustedDateTime;
-    steps.push(buildTrueSolarTimeStep(tst));
+  let dateTime = parseBirthDateTime(input.birthDate, input.birthTime, timezone);
+  const originalDateTimeIso = dateTime.toISO() ?? "";
+
+  const useTrueSolarTime =
+    input.useTrueSolarTime &&
+    resolved.locationConfidence !== "unknown" &&
+    resolved.longitude !== undefined;
+
+  if (input.useTrueSolarTime && resolved.longitude === undefined) {
+    warnings.push("已勾选真太阳时，但未获得出生地经度，已按北京时间计算。");
   }
 
-  steps.push(buildSolarTermStep(dateTime.year, input.timezone, dateTime));
-  warnings.push(...checkSolarTermProximityWarnings(dateTime, input.timezone));
+  let hourPillarChanged = false;
+  let dayPillarChanged = false;
+  let pillarsBeforeCorrection:
+    | { year: string; month: string; day: string; hour: string }
+    | undefined;
+  let correctionMinutes: number | undefined;
+  let standardLongitude: number | undefined;
+
+  if (useTrueSolarTime && resolved.longitude !== undefined) {
+    const reference = computeFourPillars(dateTime, timezone, options);
+    pillarsBeforeCorrection = {
+      year: pillarToString(reference.pillars.year),
+      month: pillarToString(reference.pillars.month),
+      day: pillarToString(reference.pillars.day),
+      hour: pillarToString(reference.pillars.hour),
+    };
+
+    const tst = calculateTrueSolarTime(
+      dateTime,
+      timezone,
+      resolved.longitude,
+      options.useEquationOfTime,
+    );
+    correctionMinutes = tst.correctionMinutes;
+    standardLongitude = tst.standardLongitude;
+    dateTime = tst.adjustedDateTime;
+
+    const adjusted = computeFourPillars(dateTime, timezone, options);
+    hourPillarChanged =
+      pillarToString(reference.pillars.hour) !==
+      pillarToString(adjusted.pillars.hour);
+    dayPillarChanged =
+      pillarToString(reference.pillars.day) !==
+      pillarToString(adjusted.pillars.day);
+
+    steps.push(
+      buildTrueSolarTimeStep(tst, { hourPillarChanged, dayPillarChanged }),
+    );
+  } else if (resolved.locationConfidence === "unknown") {
+    warnings.push("出生地未确定，未使用真太阳时修正。");
+  }
+
+  steps.push(buildSolarTermStep(dateTime.year, timezone, dateTime));
+  warnings.push(...checkSolarTermProximityWarnings(dateTime, timezone));
 
   const { pillars, steps: pillarSteps } = computeFourPillars(
     dateTime,
-    input.timezone,
+    timezone,
     options,
   );
   steps.push(...pillarSteps);
@@ -118,7 +176,7 @@ export function computeBazi(input: BaziInput): {
 
   const luckCycleResult = calculateLuckCycle(
     dateTime,
-    input.timezone,
+    timezone,
     input.gender,
     pillars,
     dateTime.year,
@@ -155,6 +213,19 @@ export function computeBazi(input: BaziInput): {
   steps.push(monthlyResult.step);
   monthlyLuckAnalysis = monthlyResult.months;
 
+  const locationInfluence: LocationInfluence = {
+    resolved,
+    originalDateTime: originalDateTimeIso,
+    adjustedDateTime: dateTime.toISO() ?? "",
+    correctionMinutes,
+    standardLongitude,
+    useTrueSolarTime,
+    hourPillarChanged,
+    dayPillarChanged,
+    pillarsBeforeCorrection,
+    regionElementNote: buildRegionElementNote(resolved.elementBias),
+  };
+
   const partialAlgo = {
     pillars,
     pillarStrings: {
@@ -175,6 +246,7 @@ export function computeBazi(input: BaziInput): {
     luckCycle: luckCycleResult.analysis,
     yearlyLuck: yearlyLuckAnalysis,
     monthlyLuck: monthlyLuckAnalysis,
+    locationInfluence,
   } as BaziAlgorithmResult;
 
   const patternsResult = analyzePatterns(partialAlgo);
@@ -205,6 +277,7 @@ export function computeBazi(input: BaziInput): {
     luckCycle: luckCycleResult.analysis,
     yearlyLuck: yearlyLuckAnalysis,
     monthlyLuck: monthlyLuckAnalysis,
+    locationInfluence,
   };
 
   return {

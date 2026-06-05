@@ -9,7 +9,12 @@ import { MysticButton } from "@/components/ui/mystic-button";
 import { FormFieldShell } from "@/components/ui/form-field-shell";
 import { PillBadge } from "@/components/ui/pill-badge";
 import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
-import { generateZodiacFortune, getZodiacById, getZodiacSign } from "@/lib/fortune/zodiac";
+import {
+  generateZodiacFortune,
+  getZodiacById,
+  getZodiacSign,
+  type FortunePeriod,
+} from "@/lib/fortune/zodiac";
 import { generateZodiacReport } from "@/lib/fortune/report/zodiacReport";
 import { toErrorResponse } from "@/lib/fortune/shared/errors";
 import { zodiacInputSchema } from "@/lib/fortune/shared/validation";
@@ -48,8 +53,18 @@ export default function ZodiacPage() {
         ? getZodiacById(input.zodiacSign) ?? getZodiacSign(input.birthDate ?? date)
         : getZodiacSign(input.birthDate ?? date);
 
-      const fortune = generateZodiacFortune(sign, input.period, date);
-      const algorithm_result = { sign, fortune, period: input.period, date };
+      const periodMap: Record<string, FortunePeriod> = {
+        daily: "daily",
+        weekly: "weekly",
+        monthly: "monthly",
+        day: "daily",
+        week: "weekly",
+        month: "monthly",
+        year: "monthly",
+      };
+      const mappedPeriod = periodMap[input.period] ?? "daily";
+      const fortune = generateZodiacFortune(sign, mappedPeriod, date);
+      const algorithm_result = { sign, fortune, period: mappedPeriod, date };
       const report = generateZodiacReport(algorithm_result);
       const data = buildFortuneSuccess("zodiac", input, algorithm_result, [
         {

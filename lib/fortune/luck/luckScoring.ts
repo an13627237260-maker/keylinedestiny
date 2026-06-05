@@ -1,4 +1,5 @@
 import type { BaziAlgorithmResult } from "../bazi";
+import { computeLocationLuckDelta } from "../location/regionElements";
 import { analyzeBranchRelations } from "../bazi/branchRelations";
 import {
   ELEMENT_GENERATES,
@@ -674,7 +675,22 @@ export function generateLuckOverview(
     Object.entries(raw).map(([k, v]) => [k, v.score]),
   ) as Record<SubCategory, number>;
 
-  const overallScore = computeOverallScore(subScoreNums, focusArea);
+  let overallScore = computeOverallScore(subScoreNums, focusArea);
+  const locationNotes: string[] = [];
+
+  const locBias = input.baziResult.locationInfluence?.resolved.elementBias;
+  if (locBias && input.baziResult.locationInfluence?.resolved.locationConfidence !== "unknown") {
+    const useful = input.baziResult.usefulGods?.usefulElementTendency ?? [];
+    const avoid = input.baziResult.usefulGods?.avoidElementTendency ?? [];
+    const delta = computeLocationLuckDelta(locBias, useful, avoid);
+    if (delta !== 0) {
+      overallScore = clampScore(overallScore + delta);
+      locationNotes.push(
+        `地域气候五行辅助调整 ${delta > 0 ? "+" : ""}${delta} 分（上限±3，不替代命局判断）`,
+      );
+    }
+  }
+
   const scores: LuckScore[] = (Object.keys(raw) as SubCategory[]).map((cat) =>
     buildLuckScore(cat, raw[cat].score, raw[cat].evidence, focusArea),
   );
@@ -691,7 +707,10 @@ export function generateLuckOverview(
     scores,
     highlights,
     cautions,
-    calculationBasis: buildCalculationBasis(input.baziResult, flow),
+    calculationBasis: [
+      ...buildCalculationBasis(input.baziResult, flow),
+      ...locationNotes,
+    ],
   };
 }
 

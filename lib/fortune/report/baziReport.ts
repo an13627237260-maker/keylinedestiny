@@ -198,6 +198,57 @@ function sectionMonthly(algo: BaziAlgorithmResult): string {
   return joinParagraphs(m.map((x) => x.hint));
 }
 
+function sectionBirthLocation(algo: BaziAlgorithmResult): string {
+  const loc = algo.locationInfluence;
+  if (!loc) {
+    return "未记录出生地信息。四柱以输入的出生时间与节气规则计算。";
+  }
+  const r = loc.resolved;
+  const parts: string[] = [
+    `选择出生地：${r.displayName}。`,
+  ];
+
+  if (r.longitude !== undefined) {
+    parts.push(
+      `经纬度约 ${r.longitude.toFixed(4)}°E${r.latitude !== undefined ? `、${r.latitude.toFixed(4)}°N` : ""}。`,
+    );
+  }
+
+  if (loc.useTrueSolarTime && loc.correctionMinutes !== undefined) {
+    const mins = Math.abs(Math.round(loc.correctionMinutes));
+    parts.push(
+      loc.correctionMinutes < 0
+        ? `真太阳时比北京时间约早 ${mins} 分钟（经度差 ${(r.longitude ?? 0) - (loc.standardLongitude ?? 120)}°）。`
+        : loc.correctionMinutes > 0
+          ? `真太阳时比北京时间约晚 ${mins} 分钟。`
+          : "出生地经度接近东八区标准经度，真太阳时与北京时间基本一致。",
+    );
+    parts.push(
+      loc.hourPillarChanged
+        ? `真太阳时修正后时柱由 ${loc.pillarsBeforeCorrection?.hour ?? "—"} 变为 ${algo.pillarStrings.hour}。`
+        : "真太阳时修正未改变时柱。",
+    );
+    parts.push(
+      loc.dayPillarChanged
+        ? `真太阳时修正改变了日柱划分。`
+        : "真太阳时修正未改变日柱。",
+    );
+    parts.push("系统已优先使用真太阳时参与四柱计算。");
+  } else {
+    parts.push("未使用真太阳时修正，四柱按输入时间计算。");
+  }
+
+  if (r.climateTags.length) {
+    parts.push(`地域气候标签：${r.climateTags.join("、")}。`);
+  }
+  parts.push(loc.regionElementNote);
+  parts.push(
+    "说明：出生地用于真太阳时校正；地域五行仅为气候环境辅助参考（约占运势辅助权重 5%-10%），不替代命局五行，不决定命运走向。",
+  );
+
+  return joinParagraphs(parts);
+}
+
 function sectionLuckOverview(
   algo: BaziAlgorithmResult,
   focusArea: string,
@@ -256,6 +307,10 @@ export function generateBaziReport(
         `五行气势：${algo.fiveElements.strongestElement}偏旺，${algo.fiveElements.weakestElement}偏弱`,
         summary,
       ]),
+    },
+    {
+      title: "出生地与真太阳时",
+      content: sectionBirthLocation(algo),
     },
     {
       title: "近期运势概览",

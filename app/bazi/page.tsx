@@ -41,8 +41,16 @@ export default function BaziPage() {
       gender: fd.get("gender"),
       birthDate: fd.get("birthDate"),
       birthTime: fd.get("birthTime"),
-      birthPlace: (fd.get("birthPlace") as string) || undefined,
-      longitude: fd.get("longitude") ? Number(fd.get("longitude")) : undefined,
+      province: (fd.get("province") as string) || undefined,
+      city: (fd.get("city") as string) || undefined,
+      birthPlaceNote: (fd.get("birthPlaceNote") as string) || undefined,
+      locationUnknown: fd.get("locationUnknown") === "on",
+      manualLongitude: fd.get("manualLongitude")
+        ? Number(fd.get("manualLongitude"))
+        : undefined,
+      manualLatitude: fd.get("manualLatitude")
+        ? Number(fd.get("manualLatitude"))
+        : undefined,
       timezone: (fd.get("timezone") as string) || "Asia/Shanghai",
       useTrueSolarTime: fd.get("useTrueSolarTime") === "on",
       focusArea: (fd.get("focusArea") as string) || "overall",
