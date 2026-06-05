@@ -77,6 +77,21 @@ describe("CHINA_PROVINCES 完整数据", () => {
     expect(sh.longitude).toBeCloseTo(121.4737, 2);
   });
 
+  it("河北重点城市经度已校准", () => {
+    const closeTo = (city: string, expected: number) => {
+      expect(
+        Math.abs(getCityEntry("河北省", city)!.longitude - expected),
+        `${city} longitude`,
+      ).toBeLessThan(0.02);
+    };
+
+    closeTo("唐山市", 118.18);
+    closeTo("秦皇岛市", 119.60);
+    closeTo("邯郸市", 114.54);
+    closeTo("保定市", 115.46);
+    closeTo("承德市", 117.96);
+  });
+
   it("所有城市坐标在中国合理范围内", () => {
     for (const p of CHINA_PROVINCES) {
       for (const c of p.cities) {

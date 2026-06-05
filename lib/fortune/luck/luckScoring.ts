@@ -517,8 +517,8 @@ function scoreMonthCategory(
       `month-pillar-${category}`,
       "month_transit",
       category,
-      "本月流月",
-      `本月流月${pillarToString(monthPillar)}，${monthGod}主导全月节奏`,
+      "本月节气流月",
+      `本月按节气月令取流月${pillarToString(monthPillar)}，${monthGod}主导全月节奏`,
       2.6,
     ),
     scoreEvidence(
@@ -713,7 +713,7 @@ function buildCalculationBasis(
     `周期：${range.period}（${range.label}）`,
     "基于本命四柱、五行、十神、合冲刑害、神煞与流期干支",
     `流年 ${transit.year.pillar}（${transit.year.stemTenGod}）`,
-    `流月 ${transit.month.pillar}（${transit.month.stemTenGod}）`,
+    `流月 ${transit.month.pillar}（${transit.month.stemTenGod}，按节气月令切换）`,
   ];
 
   if (range.period === "day") {
@@ -721,9 +721,9 @@ function buildCalculationBasis(
   } else if (range.period === "week") {
     basis.push(`聚合本周 ${range.dates.length} 天流日加权平均`);
   } else if (range.period === "month") {
-    basis.push(`以流月为主导，抽样 ${range.dates.length} 个流日节点`);
+    basis.push(`以节气流月为主导，抽样 ${range.dates.length} 个流日节点`);
   } else {
-    basis.push("以流年为主导，结合12个月流月趋势");
+    basis.push("以流年为主导，结合当前大运与12个月节气流月趋势");
   }
 
   if (transit.currentLuckCycle) {

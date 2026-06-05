@@ -9,6 +9,16 @@ export interface SolarTerm {
   dateTime: DateTime;
 }
 
+export type SolarTermSource = "approx" | "table";
+
+export interface SolarTermPrecisionMeta {
+  source: SolarTermSource;
+  precision: "approximate" | "exact";
+  tableRange: "1900-2100";
+  tableAvailable: boolean;
+  note: string;
+}
+
 export interface SolarTermContext {
   termsByYear: Record<string, SolarTerm[]>;
   metaByYear?: Record<string, DataSourceMeta>;
@@ -48,6 +58,11 @@ export const SOLAR_TERM_NAMES = [
 
 /** 月令分界节气 index（十二节） */
 export const MONTH_JIE_INDICES = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 0];
+
+type SolarTermTable = Partial<Record<number, readonly string[]>>;
+
+// 预留 1900-2100 精确节气表接口。当前未内置完整表，不能标记为精确表源。
+const SOLAR_TERM_TABLE_1900_2100: SolarTermTable = {};
 
 /**
  * 寿星天文历近似公式计算节气时刻。
@@ -144,11 +159,47 @@ function computeTermDateTime(
 }
 
 export function getBuiltInSolarTerms(year: number, timezone: string): SolarTerm[] {
+  const tableTerms = getSolarTermsFromTable(year, timezone);
+  if (tableTerms) return tableTerms;
+
   return SOLAR_TERM_NAMES.map((name, index) => ({
     name,
     index,
     dateTime: computeTermDateTime(year, index, timezone),
   }));
+}
+
+function getSolarTermsFromTable(year: number, timezone: string): SolarTerm[] | null {
+  const raw = SOLAR_TERM_TABLE_1900_2100[year];
+  if (!raw || raw.length !== SOLAR_TERM_NAMES.length) return null;
+
+  return raw.map((iso, index) => ({
+    name: SOLAR_TERM_NAMES[index],
+    index,
+    dateTime: DateTime.fromISO(iso, { zone: timezone }),
+  }));
+}
+
+export function getSolarTermPrecisionMeta(year: number): SolarTermPrecisionMeta {
+  const hasTable = Boolean(
+    SOLAR_TERM_TABLE_1900_2100[year]?.length === SOLAR_TERM_NAMES.length,
+  );
+
+  return hasTable
+    ? {
+        source: "table",
+        precision: "exact",
+        tableRange: "1900-2100",
+        tableAvailable: true,
+        note: "使用 1900-2100 精确节气表。",
+      }
+    : {
+        source: "approx",
+        precision: "approximate",
+        tableRange: "1900-2100",
+        tableAvailable: false,
+        note: "已预留 1900-2100 精确节气表接口；当前未内置完整表，使用近似算法。",
+      };
 }
 
 export function getSolarTerms(
@@ -315,6 +366,7 @@ export function buildSolarTermStep(
   const effective = getEffectiveBaziYear(dateTime, timezone, context);
   const monthInfo = getMonthBranchIndex(dateTime, timezone, context);
   const meta = calibration?.meta ?? getSolarTermMeta(year, timezone, context);
+  const precisionMeta = getSolarTermPrecisionMeta(year);
 
   return {
     step: "solar_terms",
@@ -325,6 +377,10 @@ export function buildSolarTermStep(
         ? "年柱以立春为界；月柱以十二节为界；本次使用联网校准节气表"
         : "年柱以立春为界；月柱以十二节为界（内置寿星公式，误差约±30分钟）",
     result: {
+      source: precisionMeta.source,
+      precision: precisionMeta.precision,
+      tableRange: precisionMeta.tableRange,
+      tableAvailable: precisionMeta.tableAvailable,
       sourceType: meta.sourceType,
       dataSource: getDataSourceLabel(meta),
       providerName: meta.providerName,
@@ -347,6 +403,7 @@ export function buildSolarTermStep(
       monthIndex: monthInfo.monthIndex,
     },
     notes: [
+      precisionMeta.note,
       ...meta.notes,
       ...(calibration?.warnings ?? []),
       meta.sourceType === "online_verified"

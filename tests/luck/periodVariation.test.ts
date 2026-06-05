@@ -49,6 +49,18 @@ describe("period variation", () => {
     expect(current.transitSummary.yearPillar).not.toBe(next.transitSummary.yearPillar);
   });
 
+  it("周月年计算依据分别使用 7 天流日、节气流月、流年大运与 12 个月趋势", () => {
+    const week = generateLuckOverview({ baziResult: bazi, targetDate: anchor, period: "week" });
+    const month = generateLuckOverview({ baziResult: bazi, targetDate: anchor, period: "month" });
+    const year = generateLuckOverview({ baziResult: bazi, targetDate: anchor, period: "year" });
+
+    expect(week.calculationBasis.some((basis) => basis.includes("聚合本周 7 天流日"))).toBe(true);
+    expect(month.calculationBasis.some((basis) => basis.includes("节气流月"))).toBe(true);
+    expect(year.calculationBasis.some((basis) => basis.includes("流年为主导"))).toBe(true);
+    expect(year.calculationBasis.some((basis) => basis.includes("当前大运"))).toBe(true);
+    expect(year.calculationBasis.some((basis) => basis.includes("12个月节气流月趋势"))).toBe(true);
+  });
+
   it("不使用 Math.random", () => {
     const files = [
       "lib/fortune/luck/luckScoring.ts",

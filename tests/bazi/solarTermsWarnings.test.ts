@@ -9,6 +9,9 @@ describe("solar term warnings", () => {
   it("calculation_steps 明确标记近似算法来源", () => {
     const dt = DateTime.fromISO("1990-05-15T10:30:00", { zone: "Asia/Shanghai" });
     const step = buildSolarTermStep(1990, "Asia/Shanghai", dt);
+    expect(step.result.source).toBe("approx");
+    expect(step.result.precision).toBe("approximate");
+    expect(step.result.tableAvailable).toBe(false);
     expect(step.result.sourceType).toBe("approx_algorithm");
     expect(JSON.stringify(step)).toContain("近似算法");
   });

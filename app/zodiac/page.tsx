@@ -64,7 +64,7 @@ export default function ZodiacPage() {
         day: "daily",
         week: "weekly",
         month: "monthly",
-        year: "monthly",
+        year: "yearly",
       };
       const mappedPeriod = periodMap[input.period] ?? "daily";
       const fortune = generateZodiacFortune(sign, mappedPeriod, date);
