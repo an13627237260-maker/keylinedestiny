@@ -17,6 +17,12 @@ import {
 import type { LuckCycleEntry } from "../bazi/luckCycle";
 import { getMonthPillar, getYearPillar } from "../bazi/pillars";
 import { getTenGod, type TenGod } from "../bazi/tenGods";
+import {
+  inferEvidencePolarity,
+  stableEvidenceId,
+  type EvidenceItem,
+  type EvidenceSource,
+} from "../rules/evidence";
 import { formatDate } from "./periodResolver";
 import type { LuckCategory } from "./types";
 
@@ -58,7 +64,7 @@ export interface TransitContext {
   usefulGodAlignment: number;
   avoidGodPressure: number;
   categorySignals: Record<SubCategory, number>;
-  evidence: string[];
+  evidence: EvidenceItem[];
 }
 
 const BRANCH_ELEMENT: Record<EarthlyBranch, FiveElement> = {
@@ -198,6 +204,25 @@ function addElementImpact(
   w: number,
 ) {
   impact[el] = (impact[el] ?? 0) + w;
+}
+
+function transitEvidence(
+  source: EvidenceSource,
+  title: string,
+  detail: string,
+  weight: number,
+  relatedPillars?: string[],
+): EvidenceItem {
+  return {
+    id: stableEvidenceId(`transit-${source}`, `${title}:${detail}`),
+    source,
+    category: "timing",
+    weight,
+    polarity: inferEvidencePolarity(detail),
+    title,
+    detail,
+    relatedPillars,
+  };
 }
 
 function computeCategorySignals(
@@ -386,28 +411,75 @@ export function calculateTransitContext(
   };
 
   const categorySignals = computeCategorySignals(bazi, partial);
-  const evidence: string[] = [];
+  const evidence: EvidenceItem[] = [];
 
   evidence.push(
-    `流日${day.pillar}，${day.stem}为${day.stemTenGod}，引动当日主题`,
+    transitEvidence(
+      "day_transit",
+      "流日干支",
+      `流日${day.pillar}，${day.stem}为${day.stemTenGod}，引动当日主题`,
+      3,
+      [day.pillar],
+    ),
   );
-  evidence.push(`流月${month.pillar}，${month.stemTenGod}主导当月节奏`);
-  evidence.push(`流年${year.pillar}，${year.stemTenGod}影响全年背景`);
+  evidence.push(
+    transitEvidence(
+      "month_transit",
+      "流月干支",
+      `流月${month.pillar}，${month.stemTenGod}主导当月节奏`,
+      2.6,
+      [month.pillar],
+    ),
+  );
+  evidence.push(
+    transitEvidence(
+      "year_transit",
+      "流年干支",
+      `流年${year.pillar}，${year.stemTenGod}影响全年背景`,
+      2.4,
+      [year.pillar],
+    ),
+  );
 
   if (luck) {
     evidence.push(
-      `当前大运${pillarToString(luck.pillar)}（${luck.stemTenGod}），${luck.startYear}-${luck.endYear}年`,
+      transitEvidence(
+        "luck_cycle",
+        "当前大运",
+        `当前大运${pillarToString(luck.pillar)}（${luck.stemTenGod}），${luck.startYear}-${luck.endYear}年`,
+        2.4,
+        [pillarToString(luck.pillar)],
+      ),
     );
   }
 
   for (const r of dayRelations.slice(0, 3)) {
-    evidence.push(r.description);
+    evidence.push(
+      transitEvidence("branch_relation", r.type, r.description, 2, [
+        r.transit,
+        r.natal,
+      ]),
+    );
   }
   if (usefulGodAlignment > 2) {
-    evidence.push("流期五行与喜用倾向较一致，相关事项更易顺势");
+    evidence.push(
+      transitEvidence(
+        "useful_god",
+        "喜用倾向",
+        "流期五行与喜用倾向较一致，相关事项更易顺势",
+        2.2,
+      ),
+    );
   }
   if (avoidGodPressure > 3) {
-    evidence.push("流期加重忌神五行，宜放慢节奏、不宜硬推");
+    evidence.push(
+      transitEvidence(
+        "useful_god",
+        "忌神压力",
+        "流期加重忌神五行，宜放慢节奏、不宜硬推",
+        2.2,
+      ),
+    );
   }
 
   return { ...partial, categorySignals, evidence };
@@ -438,5 +510,5 @@ export function deterministicTransitHash(
     h = Math.imul(31, h) + s.charCodeAt(i);
     h |= 0;
   }
-  return (h % 5) - 2;
+  return (((h % 5) + 5) % 5) - 2;
 }

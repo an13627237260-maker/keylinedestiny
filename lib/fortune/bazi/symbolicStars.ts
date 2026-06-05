@@ -91,7 +91,7 @@ export function findTravelHorse(pillars: FourPillars): SymbolicStar {
     basedOn: "年支/日支查驿马",
     meaning: "变动、出行、迁移",
     strength: positions.length > 0 ? "中" : "弱",
-    caution: "变动倾向不等于必然发生",
+    caution: "变动倾向只作趋势参考",
   };
 }
 
@@ -168,7 +168,7 @@ export function findNobleStar(
     basedOn: "日干查天乙贵人",
     meaning: "贵人缘、协助机遇",
     strength: positions.length > 1 ? "强" : positions.length === 1 ? "中" : "弱",
-    caution: "机遇标签，非必然遇贵人",
+    caution: "机遇标签，不作事件断语",
   };
 }
 
@@ -443,7 +443,7 @@ export function findHongLuan(pillars: FourPillars): SymbolicStar {
   })) {
     if (branch === target) positions.push(key);
   }
-  return { name: "红鸾", found: positions.length > 0, positions, basedOn: "年支查红鸾", meaning: "喜庆、姻缘、社交", strength: positions.length > 0 ? "中" : "弱", caution: "不代表必然结婚" };
+  return { name: "红鸾", found: positions.length > 0, positions, basedOn: "年支查红鸾", meaning: "喜庆、姻缘、社交", strength: positions.length > 0 ? "中" : "弱", caution: "只作社交与喜庆场景倾向参考" };
 }
 
 export function findTianXi(pillars: FourPillars): SymbolicStar {

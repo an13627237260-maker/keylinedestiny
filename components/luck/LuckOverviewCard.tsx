@@ -71,6 +71,17 @@ export function LuckOverviewCard({
     overview.startDate === overview.endDate
       ? overview.startDate
       : `${overview.startDate} — ${overview.endDate}`;
+  const evidencePool = overview.scores.flatMap((score) => score.evidence);
+  const weekElement = evidencePool.find((item) => item.title === "本周主导五行")?.detail;
+  const weekTenGod = evidencePool.find((item) => item.title === "本周主导十神")?.detail;
+  const periodInfo =
+    period === "day"
+      ? `流日 ${overview.transitSummary.dayPillar ?? "—"} · 流月 ${overview.transitSummary.monthPillar ?? "—"} · 流年 ${overview.transitSummary.yearPillar}`
+      : period === "week"
+        ? `${dateRangeLabel} · ${weekElement ?? `主导五行 ${overview.transitSummary.dominantElements.join("、") || "—"}`} · ${weekTenGod ?? `主导十神 ${overview.transitSummary.dominantTenGods.join("、") || "—"}`}`
+        : period === "month"
+          ? `流月 ${overview.transitSummary.monthPillar ?? "—"} · 流年 ${overview.transitSummary.yearPillar}`
+          : `流年 ${overview.transitSummary.yearPillar} · 大运 ${overview.transitSummary.luckCyclePillar ?? "—"}`;
 
   return (
     <MysticCard
@@ -94,6 +105,10 @@ export function LuckOverviewCard({
           baseDate={targetDate}
           dateRangeLabel={dateRangeLabel}
         />
+
+        <p className="mt-3 rounded-lg border border-[var(--border-soft)] bg-[rgba(8,6,17,0.28)] px-3 py-2 text-xs leading-relaxed text-[var(--text-muted)]">
+          {periodInfo}
+        </p>
 
         <div className="mt-5 grid gap-6 sm:grid-cols-[minmax(0,140px)_1fr]">
           <div className="text-center sm:text-left">

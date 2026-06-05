@@ -3,6 +3,12 @@ import { computeLocationLuckDelta } from "../location/regionElements";
 import { pillarToString } from "../bazi/ganzhi";
 import { getTenGod } from "../bazi/tenGods";
 import {
+  inferEvidencePolarity,
+  stableEvidenceId,
+  type EvidenceItem,
+  type EvidenceSource,
+} from "../rules/evidence";
+import {
   buildHighlightsAndCautions,
   buildLuckScore,
   buildPeriodInsights,
@@ -41,6 +47,14 @@ const SUB_CATEGORIES: SubCategory[] = [
   "social",
 ];
 
+type ScoreBreakdown = LuckScore["scoreBreakdown"];
+
+interface CategoryScoreResult {
+  score: number;
+  evidence: EvidenceItem[];
+  scoreBreakdown: ScoreBreakdown;
+}
+
 export interface GenerateLuckOverviewInput {
   baziResult: BaziAlgorithmResult;
   targetDate?: Date;
@@ -51,6 +65,117 @@ export interface GenerateLuckOverviewInput {
 
 export function clampScore(n: number): number {
   return Math.round(Math.max(SCORE_MIN, Math.min(SCORE_MAX, n)));
+}
+
+function roundImpact(n: number): number {
+  return Number(n.toFixed(2));
+}
+
+function scoreEvidence(
+  idPrefix: string,
+  source: EvidenceSource,
+  category: SubCategory | "overall",
+  title: string,
+  detail: string,
+  weight = 1.5,
+): EvidenceItem {
+  return {
+    id: stableEvidenceId(`luck-${idPrefix}`, `${category}:${title}:${detail}`),
+    source,
+    category,
+    weight,
+    polarity: inferEvidencePolarity(detail),
+    title,
+    detail,
+  };
+}
+
+function breakdownSum(b: ScoreBreakdown): number {
+  return (
+    b.base +
+    b.luckCycleImpact +
+    b.yearImpact +
+    b.monthImpact +
+    b.dayImpact +
+    b.usefulGodImpact +
+    b.relationImpact +
+    b.locationImpact +
+    b.periodHashAdjustment
+  );
+}
+
+function buildBreakdown(parts: Omit<ScoreBreakdown, "final">): ScoreBreakdown {
+  const rounded: ScoreBreakdown = {
+    base: parts.base,
+    luckCycleImpact: roundImpact(parts.luckCycleImpact),
+    yearImpact: roundImpact(parts.yearImpact),
+    monthImpact: roundImpact(parts.monthImpact),
+    dayImpact: roundImpact(parts.dayImpact),
+    usefulGodImpact: roundImpact(parts.usefulGodImpact),
+    relationImpact: roundImpact(parts.relationImpact),
+    locationImpact: roundImpact(parts.locationImpact),
+    periodHashAdjustment: roundImpact(parts.periodHashAdjustment),
+    final: 0,
+  };
+  return { ...rounded, final: clampScore(breakdownSum(rounded)) };
+}
+
+function averageBreakdowns(
+  items: Array<{ breakdown: ScoreBreakdown; weight: number }>,
+): ScoreBreakdown {
+  const total = items.reduce((sum, item) => sum + item.weight, 0) || 1;
+  const pick = (key: keyof Omit<ScoreBreakdown, "final">) =>
+    items.reduce((sum, item) => sum + item.breakdown[key] * item.weight, 0) / total;
+  return buildBreakdown({
+    base: pick("base"),
+    luckCycleImpact: pick("luckCycleImpact"),
+    yearImpact: pick("yearImpact"),
+    monthImpact: pick("monthImpact"),
+    dayImpact: pick("dayImpact"),
+    usefulGodImpact: pick("usefulGodImpact"),
+    relationImpact: pick("relationImpact"),
+    locationImpact: pick("locationImpact"),
+    periodHashAdjustment: pick("periodHashAdjustment"),
+  });
+}
+
+function withFinalAdjustments(
+  result: CategoryScoreResult,
+  category: SubCategory,
+  periodHashAdjustment: number,
+  locationImpact: number,
+): CategoryScoreResult {
+  const scoreBreakdown = buildBreakdown({
+    ...result.scoreBreakdown,
+    periodHashAdjustment,
+    locationImpact,
+  });
+  const evidence = [...result.evidence];
+  if (periodHashAdjustment !== 0) {
+    evidence.push(
+      scoreEvidence(
+        "period-hash",
+        "score_model",
+        category,
+        "周期差异微调",
+        `周期差异微调 ${periodHashAdjustment > 0 ? "+" : ""}${periodHashAdjustment}：基于周期、日期范围与流期干支确定生成`,
+        1,
+      ),
+    );
+  }
+  if (locationImpact !== 0) {
+    evidence.push(
+      scoreEvidence(
+        "location",
+        "location",
+        category,
+        "地域辅助",
+        `地域气候五行辅助调整 ${locationImpact > 0 ? "+" : ""}${locationImpact} 分`,
+        1.2,
+      ),
+    );
+  }
+  return { score: scoreBreakdown.final, evidence, scoreBreakdown };
 }
 
 function startOfDay(d: Date): Date {
@@ -202,26 +327,46 @@ function scoreDayCategory(
   transit: TransitContext,
   category: SubCategory,
   focusArea?: string,
-): { score: number; evidence: string[] } {
+): CategoryScoreResult {
   const weights = { luck: 0.2, year: 0.25, month: 0.25, day: 0.3 };
-  let score = BASE_SCORE;
-  score += scoreLayerFromTransit(bazi, transit, category, "luck") * weights.luck;
-  score += scoreLayerFromTransit(bazi, transit, category, "year") * weights.year;
-  score += scoreLayerFromTransit(bazi, transit, category, "month") * weights.month;
-  score += scoreLayerFromTransit(bazi, transit, category, "day") * weights.day;
-  score += transit.categorySignals[category] * 0.35;
-  score += transit.usefulGodAlignment * 0.15;
-  score -= transit.avoidGodPressure * 0.12;
+  const luckCycleImpact =
+    scoreLayerFromTransit(bazi, transit, category, "luck") * weights.luck;
+  const yearImpact =
+    scoreLayerFromTransit(bazi, transit, category, "year") * weights.year;
+  const monthImpact =
+    scoreLayerFromTransit(bazi, transit, category, "month") * weights.month;
+  const dayImpact =
+    scoreLayerFromTransit(bazi, transit, category, "day") * weights.day;
+  const relationImpact =
+    transit.categorySignals[category] * 0.35 + (focusArea === category ? 4 : 0);
+  const usefulGodImpact =
+    transit.usefulGodAlignment * 0.15 - transit.avoidGodPressure * 0.12;
 
-  if (focusArea === category) score += 4;
-  if (focusArea === "health" && category === "social") score += 0;
+  const scoreBreakdown = buildBreakdown({
+    base: BASE_SCORE,
+    luckCycleImpact,
+    yearImpact,
+    monthImpact,
+    dayImpact,
+    usefulGodImpact,
+    relationImpact,
+    locationImpact: 0,
+    periodHashAdjustment: 0,
+  });
 
   const evidence = [
     ...transit.evidence.slice(0, 4),
-    `流日${transit.day.pillar}对${category}类信号 ${transit.categorySignals[category] >= 0 ? "+" : ""}${Math.round(transit.categorySignals[category])}`,
+    scoreEvidence(
+      `day-${category}`,
+      "score_model",
+      category,
+      "日运分项信号",
+      `流日${transit.day.pillar}对${category}类信号 ${transit.categorySignals[category] >= 0 ? "+" : ""}${Math.round(transit.categorySignals[category])}`,
+      2,
+    ),
   ];
 
-  return { score: clampScore(score), evidence };
+  return { score: scoreBreakdown.final, evidence, scoreBreakdown };
 }
 
 function scoreWeekCategory(
@@ -229,21 +374,29 @@ function scoreWeekCategory(
   dates: Date[],
   category: SubCategory,
   focusArea?: string,
-): { score: number; evidence: string[] } {
+): CategoryScoreResult {
   let totalW = 0;
   let weighted = 0;
-  const dailyScores: { date: Date; score: number }[] = [];
+  const dailyScores: { date: Date; score: number; breakdown: ScoreBreakdown }[] = [];
   const tenGodCount: Record<string, number> = {};
-  const evidence: string[] = [];
+  const elementCount: Record<string, number> = {};
+  const relationCount: Record<string, number> = {};
+  const breakdownItems: Array<{ breakdown: ScoreBreakdown; weight: number }> = [];
+  const evidence: EvidenceItem[] = [];
 
   for (const d of dates) {
     const transit = calculateTransitContext(bazi, d);
-    const { score } = scoreDayCategory(bazi, transit, category, focusArea);
+    const { score, scoreBreakdown } = scoreDayCategory(bazi, transit, category, focusArea);
     const w = weekdayCategoryWeight(d.getDay(), category);
     weighted += score * w;
     totalW += w;
-    dailyScores.push({ date: d, score });
+    dailyScores.push({ date: d, score, breakdown: scoreBreakdown });
+    breakdownItems.push({ breakdown: scoreBreakdown, weight: w });
     tenGodCount[transit.day.stemTenGod] = (tenGodCount[transit.day.stemTenGod] ?? 0) + 1;
+    elementCount[transit.day.stemElement] = (elementCount[transit.day.stemElement] ?? 0) + 1;
+    for (const r of transit.relations.dayRelations) {
+      relationCount[r.type] = (relationCount[r.type] ?? 0) + 1;
+    }
   }
 
   const avg = weighted / totalW;
@@ -253,19 +406,78 @@ function scoreWeekCategory(
 
   const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   evidence.push(
-    `本周${weekdays[best.date.getDay()]}（${formatDate(best.date)}）${category}节奏相对突出`,
-    `本周${weekdays[worst.date.getDay()]}（${formatDate(worst.date)}）宜保守、放慢节奏`,
+    scoreEvidence(
+      `week-best-${category}`,
+      "day_transit",
+      category,
+      "本周较强日期",
+      `本周${weekdays[best.date.getDay()]}（${formatDate(best.date)}）${category}节奏相对突出`,
+      2.2,
+    ),
+    scoreEvidence(
+      `week-caution-${category}`,
+      "day_transit",
+      category,
+      "本周需留意日期",
+      `本周${weekdays[worst.date.getDay()]}（${formatDate(worst.date)}）宜保守、放慢节奏`,
+      2,
+    ),
   );
 
   const dominant = Object.entries(tenGodCount).sort((a, b) => b[1] - a[1])[0];
   if (dominant) {
-    evidence.push(`本周流日十神${dominant[0]}出现 ${dominant[1]} 次，主导本周${category}主题`);
+    evidence.push(
+      scoreEvidence(
+        `week-god-${category}`,
+        "ten_gods",
+        category,
+        "本周主导十神",
+        `本周流日十神${dominant[0]}出现 ${dominant[1]} 次，主导本周${category}主题`,
+        2,
+      ),
+    );
+  }
+  const dominantElement = Object.entries(elementCount).sort((a, b) => b[1] - a[1])[0];
+  if (dominantElement) {
+    evidence.push(
+      scoreEvidence(
+        `week-element-${category}`,
+        "five_elements",
+        category,
+        "本周主导五行",
+        `本周流日五行${dominantElement[0]}出现 ${dominantElement[1]} 次`,
+        1.8,
+      ),
+    );
+  }
+  const dominantRelation = Object.entries(relationCount).sort((a, b) => b[1] - a[1])[0];
+  if (dominantRelation) {
+    evidence.push(
+      scoreEvidence(
+        `week-relation-${category}`,
+        "branch_relation",
+        category,
+        "本周常见关系",
+        `本周流日与原局${dominantRelation[0]}关系出现 ${dominantRelation[1]} 次`,
+        1.8,
+      ),
+    );
   }
 
   const weekTransit = calculateTransitContext(bazi, dates[3] ?? dates[0]);
-  evidence.push(`本周中段流月${weekTransit.month.pillar}、流年${weekTransit.year.pillar}共同塑形`);
+  evidence.push(
+    scoreEvidence(
+      `week-anchor-${category}`,
+      "month_transit",
+      category,
+      "本周中段流期",
+      `本周中段流月${weekTransit.month.pillar}、流年${weekTransit.year.pillar}共同塑形`,
+      1.8,
+    ),
+  );
 
-  return { score: clampScore(avg), evidence };
+  const scoreBreakdown = averageBreakdowns(breakdownItems);
+  return { score: clampScore(avg), evidence, scoreBreakdown: { ...scoreBreakdown, final: clampScore(avg) } };
 }
 
 function scoreMonthCategory(
@@ -273,38 +485,83 @@ function scoreMonthCategory(
   range: ReturnType<typeof resolveLuckPeriodRange>,
   category: SubCategory,
   focusArea?: string,
-): { score: number; evidence: string[] } {
+): CategoryScoreResult {
   const anchorTransit = calculateTransitContext(bazi, range.anchorDate);
   const weights = { luck: 0.25, year: 0.3, month: 0.35, day: 0.1 };
 
-  let score = BASE_SCORE;
-  score += scoreLayerFromTransit(bazi, anchorTransit, category, "luck") * weights.luck;
-  score += scoreLayerFromTransit(bazi, anchorTransit, category, "year") * weights.year;
-  score += scoreLayerFromTransit(bazi, anchorTransit, category, "month") * weights.month;
+  const luckCycleImpact =
+    scoreLayerFromTransit(bazi, anchorTransit, category, "luck") * weights.luck;
+  const yearImpact =
+    scoreLayerFromTransit(bazi, anchorTransit, category, "year") * weights.year;
+  const monthImpact =
+    scoreLayerFromTransit(bazi, anchorTransit, category, "month") * weights.month;
 
   let daySum = 0;
   for (const d of range.dates) {
     const t = calculateTransitContext(bazi, d);
     daySum += scoreLayerFromTransit(bazi, t, category, "day");
   }
-  score += (daySum / range.dates.length) * weights.day;
-  score += anchorTransit.categorySignals[category] * 0.4;
+  const dayImpact = (daySum / range.dates.length) * weights.day;
+  const relationImpact =
+    anchorTransit.categorySignals[category] * 0.4 + (focusArea === category ? 4 : 0);
+  const usefulGodImpact =
+    anchorTransit.usefulGodAlignment * 0.1 - anchorTransit.avoidGodPressure * 0.08;
 
   const y = range.startDate.getFullYear();
   const m = range.startDate.getMonth() + 1;
   const monthPillar = getMonthPillarForCalendarMonth(y, m);
   const monthGod = getTenGod(bazi.pillars.day.stem, monthPillar.stem);
 
-  const evidence = [
-    `本月流月${pillarToString(monthPillar)}，${monthGod}主导全月节奏`,
-    `本月与流年${anchorTransit.year.pillar}、大运${anchorTransit.currentLuckCycle ? pillarToString(anchorTransit.currentLuckCycle.pillar) : "—"}共同作用`,
-    ...anchorTransit.relations.monthRelations.slice(0, 2).map((r) => r.description),
-    `月初至月末抽样 ${range.dates.length} 个节点校准流日波动`,
+  const evidence: EvidenceItem[] = [
+    scoreEvidence(
+      `month-pillar-${category}`,
+      "month_transit",
+      category,
+      "本月流月",
+      `本月流月${pillarToString(monthPillar)}，${monthGod}主导全月节奏`,
+      2.6,
+    ),
+    scoreEvidence(
+      `month-year-luck-${category}`,
+      "year_transit",
+      category,
+      "流年与大运",
+      `本月与流年${anchorTransit.year.pillar}、大运${anchorTransit.currentLuckCycle ? pillarToString(anchorTransit.currentLuckCycle.pillar) : "—"}共同作用`,
+      2,
+    ),
+    ...anchorTransit.relations.monthRelations.slice(0, 2).map((r) =>
+      scoreEvidence(
+        `month-relation-${category}-${r.type}`,
+        "branch_relation",
+        category,
+        r.type,
+        r.description,
+        1.8,
+      ),
+    ),
+    scoreEvidence(
+      `month-samples-${category}`,
+      "day_transit",
+      category,
+      "月内抽样",
+      `月初至月末抽样 ${range.dates.length} 个节点校准流日波动`,
+      1.6,
+    ),
   ];
 
-  if (focusArea === category) score += 4;
+  const scoreBreakdown = buildBreakdown({
+    base: BASE_SCORE,
+    luckCycleImpact,
+    yearImpact,
+    monthImpact,
+    dayImpact,
+    usefulGodImpact,
+    relationImpact,
+    locationImpact: 0,
+    periodHashAdjustment: 0,
+  });
 
-  return { score: clampScore(score), evidence };
+  return { score: scoreBreakdown.final, evidence, scoreBreakdown };
 }
 
 function scoreYearCategory(
@@ -312,14 +569,15 @@ function scoreYearCategory(
   range: ReturnType<typeof resolveLuckPeriodRange>,
   category: SubCategory,
   focusArea?: string,
-): { score: number; evidence: string[] } {
+): CategoryScoreResult {
   const y = range.startDate.getFullYear();
   const anchorTransit = calculateTransitContext(bazi, range.anchorDate);
   const weights = { luck: 0.35, year: 0.4, month: 0.25 };
 
-  let score = BASE_SCORE;
-  score += scoreLayerFromTransit(bazi, anchorTransit, category, "luck") * weights.luck;
-  score += scoreLayerFromTransit(bazi, anchorTransit, category, "year") * weights.year;
+  const luckCycleImpact =
+    scoreLayerFromTransit(bazi, anchorTransit, category, "luck") * weights.luck;
+  const yearImpact =
+    scoreLayerFromTransit(bazi, anchorTransit, category, "year") * weights.year;
 
   let monthDelta = 0;
   const monthScores: { month: number; pillar: string; delta: number }[] = [];
@@ -335,26 +593,76 @@ function scoreYearCategory(
     monthDelta += d;
     monthScores.push({ month: mi, pillar: pillarToString(mp), delta: d });
   }
-  score += (monthDelta / 12) * weights.month;
-  score += anchorTransit.categorySignals[category] * 0.3;
+  const monthImpact = (monthDelta / 12) * weights.month;
+  const relationImpact =
+    anchorTransit.categorySignals[category] * 0.3 + (focusArea === category ? 4 : 0);
+  const usefulGodImpact =
+    anchorTransit.usefulGodAlignment * 0.1 - anchorTransit.avoidGodPressure * 0.08;
 
   monthScores.sort((a, b) => b.delta - a.delta);
   const strong = monthScores.slice(0, 2);
   const weak = monthScores.slice(-2);
 
-  const evidence = [
-    `${y}年流年${anchorTransit.year.pillar}，${anchorTransit.year.stemTenGod}为全年主轴`,
-    anchorTransit.currentLuckCycle
-      ? `与大运${pillarToString(anchorTransit.currentLuckCycle.pillar)}（${anchorTransit.currentLuckCycle.stemTenGod}）形成年度背景`
-      : "大运数据有限，以流年与原局为主",
-    `较顺月份：${strong.map((s) => `${s.month}月${s.pillar}`).join("、")}`,
-    `谨慎月份：${weak.map((s) => `${s.month}月${s.pillar}`).join("、")}`,
-    ...anchorTransit.relations.yearRelations.slice(0, 1).map((r) => r.description),
+  const evidence: EvidenceItem[] = [
+    scoreEvidence(
+      `year-pillar-${category}`,
+      "year_transit",
+      category,
+      "目标流年",
+      `${y}年流年${anchorTransit.year.pillar}，${anchorTransit.year.stemTenGod}为全年主轴`,
+      2.8,
+    ),
+    scoreEvidence(
+      `year-luck-${category}`,
+      "luck_cycle",
+      category,
+      "年度大运背景",
+      anchorTransit.currentLuckCycle
+        ? `与大运${pillarToString(anchorTransit.currentLuckCycle.pillar)}（${anchorTransit.currentLuckCycle.stemTenGod}）形成年度背景`
+        : "大运数据有限，以流年与原局为主",
+      2.2,
+    ),
+    scoreEvidence(
+      `year-strong-months-${category}`,
+      "month_transit",
+      category,
+      "较顺月份",
+      `较顺月份：${strong.map((s) => `${s.month}月${s.pillar}`).join("、")}`,
+      2,
+    ),
+    scoreEvidence(
+      `year-weak-months-${category}`,
+      "month_transit",
+      category,
+      "需留意月份",
+      `需留意月份：${weak.map((s) => `${s.month}月${s.pillar}`).join("、")}`,
+      2,
+    ),
+    ...anchorTransit.relations.yearRelations.slice(0, 1).map((r) =>
+      scoreEvidence(
+        `year-relation-${category}-${r.type}`,
+        "branch_relation",
+        category,
+        r.type,
+        r.description,
+        1.8,
+      ),
+    ),
   ];
 
-  if (focusArea === category) score += 4;
+  const scoreBreakdown = buildBreakdown({
+    base: BASE_SCORE,
+    luckCycleImpact,
+    yearImpact,
+    monthImpact,
+    dayImpact: 0,
+    usefulGodImpact,
+    relationImpact,
+    locationImpact: 0,
+    periodHashAdjustment: 0,
+  });
 
-  return { score: clampScore(score), evidence };
+  return { score: scoreBreakdown.final, evidence, scoreBreakdown };
 }
 
 function computeCategoryForPeriod(
@@ -362,7 +670,7 @@ function computeCategoryForPeriod(
   range: ReturnType<typeof resolveLuckPeriodRange>,
   category: SubCategory,
   focusArea?: string,
-): { score: number; evidence: string[] } {
+): CategoryScoreResult {
   switch (range.period) {
     case "day": {
       const transit = calculateTransitContext(bazi, range.anchorDate);
@@ -378,11 +686,10 @@ function computeCategoryForPeriod(
 }
 
 function applyDeterministicAdjustment(
-  scores: Record<SubCategory, number>,
   period: LuckPeriod,
   range: ReturnType<typeof resolveLuckPeriodRange>,
   anchorTransit: TransitContext,
-): { scores: Record<SubCategory, number>; basisNote?: string } {
+): { adjustment: number; basisNote?: string } {
   const pillarKey = `${anchorTransit.year.pillar}|${anchorTransit.month.pillar}|${anchorTransit.day.pillar}`;
   const hash = deterministicTransitHash(
     period,
@@ -390,14 +697,9 @@ function applyDeterministicAdjustment(
     formatDate(range.endDate),
     pillarKey,
   );
-  if (hash === 0) return { scores };
-
-  const adjusted = { ...scores };
-  for (const cat of SUB_CATEGORIES) {
-    adjusted[cat] = clampScore(adjusted[cat] + hash);
-  }
+  if (hash === 0) return { adjustment: 0 };
   return {
-    scores: adjusted,
+    adjustment: hash,
     basisNote: `周期差异微调：基于流期干支哈希，修正 ${hash > 0 ? "+" : ""}${hash}`,
   };
 }
@@ -470,33 +772,21 @@ export function generateLuckOverview(
   const { baziResult } = input;
   const anchorTransit = calculateTransitContext(baziResult, range.anchorDate);
 
-  const raw: Record<SubCategory, { score: number; evidence: string[] }> =
-    {} as Record<SubCategory, { score: number; evidence: string[] }>;
+  const raw: Record<SubCategory, CategoryScoreResult> =
+    {} as Record<SubCategory, CategoryScoreResult>;
 
   for (const cat of SUB_CATEGORIES) {
     raw[cat] = computeCategoryForPeriod(baziResult, range, cat, focusArea);
   }
 
-  let subScoreNums = Object.fromEntries(
-    SUB_CATEGORIES.map((c) => [c, raw[c].score]),
-  ) as Record<SubCategory, number>;
-
-  const { scores: adjusted, basisNote } = applyDeterministicAdjustment(
-    subScoreNums,
+  const { adjustment: periodHashAdjustment, basisNote } = applyDeterministicAdjustment(
     input.period,
     range,
     anchorTransit,
   );
-  subScoreNums = adjusted;
-
-  const weights = getCategoryWeights(focusArea);
-  let overallScore = 0;
-  for (const cat of SUB_CATEGORIES) {
-    overallScore += subScoreNums[cat] * weights[cat];
-  }
-  overallScore = clampScore(overallScore);
 
   const locationNotes: string[] = [];
+  let locationImpact = 0;
   const locBias = baziResult.locationInfluence?.resolved.elementBias;
   if (
     locBias &&
@@ -506,18 +796,41 @@ export function generateLuckOverview(
     const avoid = baziResult.usefulGods?.avoidElementTendency ?? [];
     const delta = computeLocationLuckDelta(locBias, useful, avoid);
     if (delta !== 0) {
-      overallScore = clampScore(overallScore + delta);
+      locationImpact = delta;
       locationNotes.push(
         `地域气候五行辅助调整 ${delta > 0 ? "+" : ""}${delta} 分（上限±3）`,
       );
     }
   }
 
+  const adjustedRaw: Record<SubCategory, CategoryScoreResult> =
+    {} as Record<SubCategory, CategoryScoreResult>;
+  for (const cat of SUB_CATEGORIES) {
+    adjustedRaw[cat] = withFinalAdjustments(
+      raw[cat],
+      cat,
+      periodHashAdjustment,
+      locationImpact,
+    );
+  }
+
+  const subScoreNums = Object.fromEntries(
+    SUB_CATEGORIES.map((c) => [c, adjustedRaw[c].score]),
+  ) as Record<SubCategory, number>;
+
+  const weights = getCategoryWeights(focusArea);
+  let overallScore = 0;
+  for (const cat of SUB_CATEGORIES) {
+    overallScore += subScoreNums[cat] * weights[cat];
+  }
+  overallScore = clampScore(overallScore);
+
   const scores: LuckScore[] = SUB_CATEGORIES.map((cat) =>
     buildLuckScore({
       category: cat,
       score: subScoreNums[cat],
-      evidence: raw[cat].evidence,
+      evidence: adjustedRaw[cat].evidence,
+      scoreBreakdown: adjustedRaw[cat].scoreBreakdown,
       focusArea,
       period: input.period,
       dateLabel: range.label,

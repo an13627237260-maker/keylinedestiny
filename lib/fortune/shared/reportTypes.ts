@@ -1,8 +1,11 @@
+import type { EvidenceItem } from "../rules/evidence";
+
 export interface ReportSection {
   title: string;
   content: string;
   highlights?: string[];
   warnings?: string[];
+  evidence?: EvidenceItem[];
 }
 
 export interface FortuneReport {
@@ -18,6 +21,7 @@ export interface RuleResult {
   category: string;
   score: number;
   message: string;
-  evidence: string[];
+  evidence: EvidenceItem[];
   tags: string[];
+  confidence: number;
 }

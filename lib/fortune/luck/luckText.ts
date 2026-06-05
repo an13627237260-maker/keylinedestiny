@@ -1,4 +1,5 @@
 import { pillarToString } from "../bazi/ganzhi";
+import type { EvidenceItem } from "../rules/evidence";
 import type { LuckPeriodRange } from "./periodResolver";
 import type { TransitContext } from "./transitCalculator";
 import type {
@@ -63,8 +64,8 @@ function periodOpener(
   return `${startDate.slice(0, 4)}年流年${transit.year.pillar}（${transit.year.stemTenGod}）为全年主轴，结合大运与十二流月趋势研判。`;
 }
 
-function evidenceSentences(evidence: string[], category: SubCategory): string {
-  const filtered = evidence.filter((e) => e.length > 4);
+function evidenceSentences(evidence: EvidenceItem[], category: SubCategory): string {
+  const filtered = evidence.map((e) => e.detail).filter((e) => e.length > 4);
   const pick = filtered.slice(0, 2);
   if (pick.length < 2 && filtered.length > 0) {
     pick.push(filtered[filtered.length - 1]);
@@ -75,9 +76,10 @@ function evidenceSentences(evidence: string[], category: SubCategory): string {
   return pick.join("；") + "。";
 }
 
-function relationTone(evidence: string[]): string {
-  const hasClash = evidence.some((e) => e.includes("冲") || e.includes("放缓"));
-  const hasCombine = evidence.some((e) => e.includes("合") || e.includes("连接"));
+function relationTone(evidence: EvidenceItem[]): string {
+  const details = evidence.map((e) => e.detail);
+  const hasClash = details.some((e) => e.includes("冲") || e.includes("放缓"));
+  const hasCombine = details.some((e) => e.includes("合") || e.includes("连接"));
   if (hasClash) {
     return "存在冲动关系时，宜节奏放缓、沟通留余地、不急着做决定。";
   }
@@ -135,18 +137,19 @@ function padToMinLength(text: string, minLen: number): string {
 interface BuildLuckScoreInput {
   category: SubCategory;
   score: number;
-  evidence: string[];
+  evidence: EvidenceItem[];
   focusArea?: string;
   period: LuckPeriod;
   dateLabel: string;
   startDate: string;
   endDate: string;
   transit: TransitContext;
+  scoreBreakdown: LuckScore["scoreBreakdown"];
 }
 
 export function buildLuckScoreText(
   input: BuildLuckScoreInput,
-): Pick<LuckScore, "summary" | "advice" | "keywords"> {
+): Pick<LuckScore, "summary" | "detail" | "advice" | "keywords"> {
   const t = tier(input.score);
   const opener = periodOpener(
     input.period,
@@ -166,12 +169,16 @@ export function buildLuckScoreText(
   }
   summary = padToMinLength(summary, 120);
   if (summary.length > 320) summary = summary.slice(0, 318) + "…";
+  const detail = `依据：${input.evidence
+    .slice(0, 4)
+    .map((e) => e.detail)
+    .join("；")}。分数拆解：基础分 ${input.scoreBreakdown.base}，大运 ${input.scoreBreakdown.luckCycleImpact.toFixed(1)}，流年 ${input.scoreBreakdown.yearImpact.toFixed(1)}，流月 ${input.scoreBreakdown.monthImpact.toFixed(1)}，流日 ${input.scoreBreakdown.dayImpact.toFixed(1)}，关系 ${input.scoreBreakdown.relationImpact.toFixed(1)}，喜用 ${input.scoreBreakdown.usefulGodImpact.toFixed(1)}，地域 ${input.scoreBreakdown.locationImpact.toFixed(1)}，周期 ${input.scoreBreakdown.periodHashAdjustment.toFixed(1)}。`;
 
   const advice: string[] = [];
-  if (input.evidence.some((e) => e.includes("冲"))) {
+  if (input.evidence.some((e) => e.detail.includes("冲"))) {
     advice.push("节奏放缓，沟通留余地");
   }
-  if (input.evidence.some((e) => e.includes("合") || e.includes("连接"))) {
+  if (input.evidence.some((e) => e.detail.includes("合") || e.detail.includes("连接"))) {
     advice.push("适合连接与合作推进");
   }
   if (input.transit.day.stemTenGod.includes("财") && input.category === "wealth") {
@@ -221,7 +228,7 @@ export function buildLuckScoreText(
     }
   }
 
-  return { summary, advice: advice.slice(0, 4), keywords };
+  return { summary, detail, advice: advice.slice(0, 4), keywords };
 }
 
 export function buildLuckScore(input: BuildLuckScoreInput): LuckScore {
@@ -235,6 +242,7 @@ export function buildLuckScore(input: BuildLuckScoreInput): LuckScore {
     level,
     color: LUCK_CATEGORY_COLORS[input.category],
     evidence: input.evidence,
+    scoreBreakdown: input.scoreBreakdown,
     ...text,
   };
 }

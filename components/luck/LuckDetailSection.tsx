@@ -32,6 +32,7 @@ export function LuckDetailSection({ score }: { score: LuckScore | null }) {
         </div>
 
         <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">{score.summary}</p>
+        <p className="mt-2 text-xs leading-relaxed text-[var(--text-dim)]">{score.detail}</p>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           {score.keywords.map((kw) => (
@@ -49,6 +50,20 @@ export function LuckDetailSection({ score }: { score: LuckScore | null }) {
             </li>
           ))}
         </ul>
+
+        {score.evidence.length > 0 && (
+          <div className="mt-4 border-t border-[var(--border-soft)] pt-3">
+            <p className="text-xs font-medium text-[var(--purple-soft)]">依据</p>
+            <ul className="mt-2 space-y-1.5">
+              {score.evidence.slice(0, 5).map((item) => (
+                <li key={item.id} className="text-xs leading-relaxed text-[var(--text-dim)]">
+                  <span className="text-[var(--gold-main)]">{item.title} · </span>
+                  {item.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

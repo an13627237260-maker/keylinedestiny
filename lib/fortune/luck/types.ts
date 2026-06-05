@@ -1,3 +1,5 @@
+import type { EvidenceItem } from "../rules/evidence";
+
 export type LuckPeriod = "day" | "week" | "month" | "year";
 
 export type LuckCategory =
@@ -16,8 +18,21 @@ export interface LuckScore {
   color: string;
   keywords: string[];
   summary: string;
+  detail: string;
   advice: string[];
-  evidence: string[];
+  evidence: EvidenceItem[];
+  scoreBreakdown: {
+    base: number;
+    luckCycleImpact: number;
+    yearImpact: number;
+    monthImpact: number;
+    dayImpact: number;
+    usefulGodImpact: number;
+    relationImpact: number;
+    locationImpact: number;
+    periodHashAdjustment: number;
+    final: number;
+  };
 }
 
 export interface TransitSummary {

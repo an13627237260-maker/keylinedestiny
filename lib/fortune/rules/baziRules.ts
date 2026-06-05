@@ -154,11 +154,55 @@ function buildDayMasterRules(): Rule[] {
 
 function buildCareerRules(): Rule[] {
   const combos = [
-    { id: "career-shishang-cai", tags: ["食伤生财"], check: (c: BaziRuleContext) => (godCount(c, "食神") + godCount(c, "伤官")) > 1 && (godCount(c, "正财") + godCount(c, "偏财")) > 0.8, msg: "食伤生财结构明显，适合靠表达、技能、创意、内容与销售变现。" },
-    { id: "career-guanyin", tags: ["官印相生"], check: (c: BaziRuleContext) => godCount(c, "正官") > 0.8 && (godCount(c, "正印") + godCount(c, "偏印")) > 0.8, msg: "官印相生，适合稳定路径、学历证书、组织平台与管理体系。" },
-    { id: "career-shayin", tags: ["杀印相生"], check: (c: BaziRuleContext) => godCount(c, "七杀") > 0.8 && (godCount(c, "正印") + godCount(c, "偏印")) > 0.8, msg: "杀印相生，适合高压环境下成长，技术、管理与竞争型岗位有发挥空间。" },
-    { id: "career-caiguan", tags: ["财官相生"], check: (c: BaziRuleContext) => (godCount(c, "正财") + godCount(c, "偏财")) > 1 && godCount(c, "正官") > 0.8, msg: "财官相生，适合商业、管理与资源整合类方向。" },
-    { id: "career-bijie", tags: ["比劫旺"], check: (c: BaziRuleContext) => (godCount(c, "比肩") + godCount(c, "劫财")) > 2, msg: "比劫较旺，适合创业、团队与竞争行业，但合伙与人情开支需谨慎。" },
+    {
+      id: "career-shishang-cai",
+      tags: ["食伤生财"],
+      check: (c: BaziRuleContext) => (godCount(c, "食神") + godCount(c, "伤官")) > 1 && (godCount(c, "正财") + godCount(c, "偏财")) > 0.8,
+      msg: "食伤生财结构明显，适合靠表达、技能、创意、内容与销售变现。",
+      evidence: (c: BaziRuleContext) => [
+        `食伤合计 ${(godCount(c, "食神") + godCount(c, "伤官")).toFixed(1)}`,
+        `财星合计 ${(godCount(c, "正财") + godCount(c, "偏财")).toFixed(1)}`,
+      ],
+    },
+    {
+      id: "career-guanyin",
+      tags: ["官印相生"],
+      check: (c: BaziRuleContext) => godCount(c, "正官") > 0.8 && (godCount(c, "正印") + godCount(c, "偏印")) > 0.8,
+      msg: "官印相生，适合稳定路径、学历证书、组织平台与管理体系。",
+      evidence: (c: BaziRuleContext) => [
+        `正官计数 ${godCount(c, "正官").toFixed(1)}`,
+        `印星合计 ${(godCount(c, "正印") + godCount(c, "偏印")).toFixed(1)}`,
+      ],
+    },
+    {
+      id: "career-shayin",
+      tags: ["杀印相生"],
+      check: (c: BaziRuleContext) => godCount(c, "七杀") > 0.8 && (godCount(c, "正印") + godCount(c, "偏印")) > 0.8,
+      msg: "杀印相生，适合高压环境下成长，技术、管理与竞争型岗位有发挥空间。",
+      evidence: (c: BaziRuleContext) => [
+        `七杀计数 ${godCount(c, "七杀").toFixed(1)}`,
+        `印星合计 ${(godCount(c, "正印") + godCount(c, "偏印")).toFixed(1)}`,
+      ],
+    },
+    {
+      id: "career-caiguan",
+      tags: ["财官相生"],
+      check: (c: BaziRuleContext) => (godCount(c, "正财") + godCount(c, "偏财")) > 1 && godCount(c, "正官") > 0.8,
+      msg: "财官相生，适合商业、管理与资源整合类方向。",
+      evidence: (c: BaziRuleContext) => [
+        `财星合计 ${(godCount(c, "正财") + godCount(c, "偏财")).toFixed(1)}`,
+        `正官计数 ${godCount(c, "正官").toFixed(1)}`,
+      ],
+    },
+    {
+      id: "career-bijie",
+      tags: ["比劫旺"],
+      check: (c: BaziRuleContext) => (godCount(c, "比肩") + godCount(c, "劫财")) > 2,
+      msg: "比劫较旺，适合创业、团队与竞争行业，但合伙与人情开支需谨慎。",
+      evidence: (c: BaziRuleContext) => [
+        `比劫合计 ${(godCount(c, "比肩") + godCount(c, "劫财")).toFixed(1)}`,
+      ],
+    },
   ];
   return combos.map((c) => ({
     id: c.id,
@@ -168,7 +212,7 @@ function buildCareerRules(): Rule[] {
     score: 70,
     tags: c.tags,
     message: c.msg,
-    evidence: () => c.tags,
+    evidence: c.evidence,
   }));
 }
 
@@ -208,7 +252,10 @@ function buildWealthRules(): Rule[] {
       score: 68,
       tags: ["比劫旺财弱"],
       message: "比劫旺而财星弱，易因人情、合伙或冲动影响财务，宜设清晰预算与边界。",
-      evidence: () => ["比劫明显", "财星相对弱"],
+      evidence: (ctx) => [
+        `比劫合计 ${(godCount(ctx, "比肩") + godCount(ctx, "劫财")).toFixed(1)}`,
+        `财星合计 ${(godCount(ctx, "正财") + godCount(ctx, "偏财")).toFixed(1)}`,
+      ],
     },
     {
       id: "wealth-shishang",
@@ -218,7 +265,7 @@ function buildWealthRules(): Rule[] {
       score: 70,
       tags: ["食伤生财潜力"],
       message: "食伤较旺，适合通过技能、表达、内容与专业能力生财，宜把才华产品化。",
-      evidence: () => ["食伤结构突出"],
+      evidence: (ctx) => [`食伤合计 ${(godCount(ctx, "食神") + godCount(ctx, "伤官")).toFixed(1)}`],
     },
     {
       id: "wealth-yin-cai",
@@ -230,7 +277,10 @@ function buildWealthRules(): Rule[] {
       score: 66,
       tags: ["先学后财"],
       message: "印旺而财弱，适合先学技能、证书与专业积累，再谈稳定变现。",
-      evidence: () => ["印星明显"],
+      evidence: (ctx) => [
+        `印星合计 ${(godCount(ctx, "正印") + godCount(ctx, "偏印")).toFixed(1)}`,
+        `财星合计 ${(godCount(ctx, "正财") + godCount(ctx, "偏财")).toFixed(1)}`,
+      ],
     },
   ];
 }
@@ -265,7 +315,10 @@ function buildLoveRules(): Rule[] {
       score: 63,
       tags: ["红鸾"],
       message: "红鸾星见，社交与喜庆场合缘分偏多，宜主动但不强求结果。",
-      evidence: () => ["红鸾命中"],
+      evidence: (ctx) =>
+        ctx.algo.symbolicStars
+          .filter((s) => s.name === "红鸾" && s.found)
+          .map((s) => `红鸾命中位置 ${s.positions.join("、")}`),
     },
     {
       id: "love-shangguan",
@@ -275,7 +328,7 @@ function buildLoveRules(): Rule[] {
       score: 62,
       tags: ["伤官感情"],
       message: "伤官较旺，感情中表达直接、不喜束缚，宜寻找能欣赏个性的相处方式。",
-      evidence: () => ["伤官偏旺"],
+      evidence: (ctx) => [`伤官计数 ${godCount(ctx, "伤官").toFixed(1)}`],
     },
     {
       id: "love-bijie",
@@ -285,19 +338,19 @@ function buildLoveRules(): Rule[] {
       score: 60,
       tags: ["比劫感情"],
       message: "比劫较旺，感情中独立性强，需平衡自我与伴侣需求，避免竞争心态带入关系。",
-      evidence: () => ["比劫明显"],
+      evidence: (ctx) => [`比劫合计 ${(godCount(ctx, "比肩") + godCount(ctx, "劫财")).toFixed(1)}`],
     },
   ];
 }
 
 function buildStudyRules(): Rule[] {
   return [
-    { id: "study-yin", category: "study" as const, priority: 78, condition: (c) => (godCount(c, "正印") + godCount(c, "偏印")) > 1.5, score: 75, tags: ["印星学习"], message: "印星较旺，适合系统学习、证书考试与理论积累，学习要建立知识框架。", evidence: () => ["印星旺"] },
-    { id: "study-shishang", category: "study" as const, priority: 76, condition: (c) => godCount(c, "食神") + godCount(c, "伤官") > 1.5, score: 73, tags: ["食伤学习"], message: "食伤较旺，适合输出式学习，通过讲解、写作与做题巩固更有效。", evidence: () => ["食伤旺"] },
-    { id: "study-guansha", category: "study" as const, priority: 75, condition: (c) => godCount(c, "正官") + godCount(c, "七杀") > 1.5, score: 72, tags: ["官杀学习"], message: "官杀较旺，适合目标型学习，需要压力与 deadline，但要防止焦虑过度。", evidence: () => ["官杀旺"] },
-    { id: "study-bijie", category: "study" as const, priority: 74, condition: (c) => godCount(c, "比肩") + godCount(c, "劫财") > 1.5, score: 70, tags: ["比劫学习"], message: "比劫较旺，适合竞争型学习，可通过同伴比较激发动力，但避免心态失衡。", evidence: () => ["比劫旺"] },
-    { id: "study-cai", category: "study" as const, priority: 73, condition: (c) => godCount(c, "正财") + godCount(c, "偏财") > 1.2, score: 68, tags: ["财星学习"], message: "财星较旺，学习易受现实目标驱动，明确学习能带来结果时效率更高。", evidence: () => ["财星旺"] },
-    { id: "study-wenchang", category: "study" as const, priority: 72, condition: (c) => c.algo.symbolicStars.some((s) => s.name === "文昌贵人" && s.found), score: 67, tags: ["文昌"], message: "文昌贵人见，利于阅读、考试与文书类学习，宜制定复习计划。", evidence: () => ["文昌命中"] },
+    { id: "study-yin", category: "study" as const, priority: 78, condition: (c) => (godCount(c, "正印") + godCount(c, "偏印")) > 1.5, score: 75, tags: ["印星学习"], message: "印星较旺，适合系统学习、证书考试与理论积累，学习要建立知识框架。", evidence: (c) => [`印星合计 ${(godCount(c, "正印") + godCount(c, "偏印")).toFixed(1)}`] },
+    { id: "study-shishang", category: "study" as const, priority: 76, condition: (c) => godCount(c, "食神") + godCount(c, "伤官") > 1.5, score: 73, tags: ["食伤学习"], message: "食伤较旺，适合输出式学习，通过讲解、写作与做题巩固更有效。", evidence: (c) => [`食伤合计 ${(godCount(c, "食神") + godCount(c, "伤官")).toFixed(1)}`] },
+    { id: "study-guansha", category: "study" as const, priority: 75, condition: (c) => godCount(c, "正官") + godCount(c, "七杀") > 1.5, score: 72, tags: ["官杀学习"], message: "官杀较旺，适合目标型学习，需要压力与 deadline，但要防止焦虑过度。", evidence: (c) => [`官杀合计 ${(godCount(c, "正官") + godCount(c, "七杀")).toFixed(1)}`] },
+    { id: "study-bijie", category: "study" as const, priority: 74, condition: (c) => godCount(c, "比肩") + godCount(c, "劫财") > 1.5, score: 70, tags: ["比劫学习"], message: "比劫较旺，适合竞争型学习，可通过同伴比较激发动力，但避免心态失衡。", evidence: (c) => [`比劫合计 ${(godCount(c, "比肩") + godCount(c, "劫财")).toFixed(1)}`] },
+    { id: "study-cai", category: "study" as const, priority: 73, condition: (c) => godCount(c, "正财") + godCount(c, "偏财") > 1.2, score: 68, tags: ["财星学习"], message: "财星较旺，学习易受现实目标驱动，明确学习能带来结果时效率更高。", evidence: (c) => [`财星合计 ${(godCount(c, "正财") + godCount(c, "偏财")).toFixed(1)}`] },
+    { id: "study-wenchang", category: "study" as const, priority: 72, condition: (c) => c.algo.symbolicStars.some((s) => s.name === "文昌贵人" && s.found), score: 67, tags: ["文昌"], message: "文昌贵人见，利于阅读、考试与文书类学习，宜制定复习计划。", evidence: (c) => c.algo.symbolicStars.filter((s) => s.name === "文昌贵人" && s.found).map((s) => `文昌贵人命中位置 ${s.positions.join("、")}`) },
   ];
 }
 
@@ -353,32 +406,146 @@ function buildYearlyRules(): Rule[] {
 }
 
 function buildAdviceRules(): Rule[] {
-  const tips = [
-    "把大目标拆成可执行的周计划，比空泛许愿更有效。",
-    "重要决定尽量避开情绪高峰，给自己二十四小时冷静期。",
-    "财务上建立应急储备，比追逐单次机会更稳妥。",
-    "学习时采用「输入—输出—复盘」三步循环，巩固记忆。",
-    "感情中多表达需求而非指责，减少误读空间。",
-    "工作中主动对齐上级预期，减少返工与内耗。",
-    "健康方面优先保证睡眠，比任何补法都基础。",
-    "遇到冲突先厘清事实再谈立场，避免扩大化。",
-    "每月复盘一次五行能量对应的作息与情绪模式。",
-    "把擅长的事做成可展示的作品集，机会更易被看见。",
-    "合作前书面约定分工与退出机制，减少日后纠纷。",
-    "流年变动期宜守正出奇，先稳后扩。",
-    "阅读经典命理典籍时，重在理解逻辑而非迷信断语。",
-    "定期整理居住环境，有助于稳定心绪与执行力。",
-    "对不确定信息保持求证习惯，不轻信恐吓式断语。",
+  const tips: Array<{
+    id: string;
+    msg: string;
+    condition: (ctx: BaziRuleContext) => boolean;
+    evidence: (ctx: BaziRuleContext) => string[];
+    tags: string[];
+  }> = [
+    {
+      id: "weekly-plan",
+      msg: "日主偏强或木气较明显时，适合把目标拆成周计划，用执行节奏承接主动性。",
+      condition: (ctx) =>
+        ctx.algo.dayMasterStrength.strengthLevel === "strong" ||
+        ctx.algo.fiveElements.strongestElement === "木",
+      evidence: (ctx) => [
+        `日主强弱 ${ctx.algo.dayMasterStrength.strengthLevel}`,
+        `最旺五行 ${ctx.algo.fiveElements.strongestElement}`,
+      ],
+      tags: ["计划", "木"],
+    },
+    {
+      id: "cooldown",
+      msg: "火气或伤官较明显时，重要沟通前宜留出冷静时间，先确认事实再表达判断。",
+      condition: (ctx) =>
+        ctx.algo.fiveElements.strongestElement === "火" || godCount(ctx, "伤官") > 1,
+      evidence: (ctx) => [
+        `最旺五行 ${ctx.algo.fiveElements.strongestElement}`,
+        `伤官计数 ${godCount(ctx, "伤官").toFixed(1)}`,
+      ],
+      tags: ["火", "伤官"],
+    },
+    {
+      id: "budget",
+      msg: "财星或比劫信号较明显时，财务上宜设预算与应急储备，减少人情与冲动消耗。",
+      condition: (ctx) =>
+        godCount(ctx, "正财") + godCount(ctx, "偏财") > 0.8 ||
+        godCount(ctx, "比肩") + godCount(ctx, "劫财") > 1.2,
+      evidence: (ctx) => [
+        `财星合计 ${(godCount(ctx, "正财") + godCount(ctx, "偏财")).toFixed(1)}`,
+        `比劫合计 ${(godCount(ctx, "比肩") + godCount(ctx, "劫财")).toFixed(1)}`,
+      ],
+      tags: ["财务", "财星", "比劫"],
+    },
+    {
+      id: "study-loop",
+      msg: "印星或食伤较明显时，学习宜采用输入、输出、校正的循环，让知识能被验证。",
+      condition: (ctx) =>
+        godCount(ctx, "正印") + godCount(ctx, "偏印") > 0.8 ||
+        godCount(ctx, "食神") + godCount(ctx, "伤官") > 0.8,
+      evidence: (ctx) => [
+        `印星合计 ${(godCount(ctx, "正印") + godCount(ctx, "偏印")).toFixed(1)}`,
+        `食伤合计 ${(godCount(ctx, "食神") + godCount(ctx, "伤官")).toFixed(1)}`,
+      ],
+      tags: ["学习", "印星", "食伤"],
+    },
+    {
+      id: "relationship-need",
+      msg: "夫妻宫受冲或食伤表达强时，感情沟通宜讲清需求，少用猜测替代确认。",
+      condition: (ctx) =>
+        ctx.algo.branchRelations.clashes.some((c) => c.pillars.includes("day")) ||
+        godCount(ctx, "食神") + godCount(ctx, "伤官") > 1,
+      evidence: (ctx) => [
+        ...ctx.algo.branchRelations.clashes
+          .filter((c) => c.pillars.includes("day"))
+          .map((c) => c.description),
+        `食伤合计 ${(godCount(ctx, "食神") + godCount(ctx, "伤官")).toFixed(1)}`,
+      ],
+      tags: ["感情", "食伤"],
+    },
+    {
+      id: "career-align",
+      msg: "官杀较明显时，工作中宜主动对齐规则与交付标准，再推进具体任务。",
+      condition: (ctx) => godCount(ctx, "正官") + godCount(ctx, "七杀") > 0.8,
+      evidence: (ctx) => [`官杀合计 ${(godCount(ctx, "正官") + godCount(ctx, "七杀")).toFixed(1)}`],
+      tags: ["事业", "官杀"],
+    },
+    {
+      id: "sleep-rhythm",
+      msg: "水弱或火旺时，生活方式宜先稳住睡眠与恢复节奏，再谈额外调整。",
+      condition: (ctx) =>
+        ctx.algo.fiveElements.weakestElement === "水" ||
+        ctx.algo.fiveElements.strongestElement === "火",
+      evidence: (ctx) => [
+        `最弱五行 ${ctx.algo.fiveElements.weakestElement}`,
+        `最旺五行 ${ctx.algo.fiveElements.strongestElement}`,
+      ],
+      tags: ["生活方式", "水", "火"],
+    },
+    {
+      id: "relation-check",
+      msg: "命局见冲刑害时，遇到分歧宜先厘清事实，再讨论立场与责任边界。",
+      condition: (ctx) =>
+        ctx.algo.branchRelations.clashes.length > 0 ||
+        ctx.algo.branchRelations.harms.length > 0 ||
+        ctx.algo.branchRelations.punishments.length > 0,
+      evidence: (ctx) => [
+        ...ctx.algo.branchRelations.clashes.map((c) => c.description),
+        ...ctx.algo.branchRelations.harms.map((c) => c.description),
+        ...ctx.algo.branchRelations.punishments.map((c) => c.description),
+      ].slice(0, 3),
+      tags: ["合冲刑害"],
+    },
+    {
+      id: "portfolio",
+      msg: "食伤或财星较明显时，适合把技能、表达或成果整理成可展示的作品与记录。",
+      condition: (ctx) =>
+        godCount(ctx, "食神") + godCount(ctx, "伤官") > 1 ||
+        godCount(ctx, "正财") + godCount(ctx, "偏财") > 1,
+      evidence: (ctx) => [
+        `食伤合计 ${(godCount(ctx, "食神") + godCount(ctx, "伤官")).toFixed(1)}`,
+        `财星合计 ${(godCount(ctx, "正财") + godCount(ctx, "偏财")).toFixed(1)}`,
+      ],
+      tags: ["作品", "食伤", "财星"],
+    },
+    {
+      id: "partnership-boundary",
+      msg: "比劫较明显时，合作前宜明确分工、预算与退出机制，减少后续误会。",
+      condition: (ctx) => godCount(ctx, "比肩") + godCount(ctx, "劫财") > 1,
+      evidence: (ctx) => [`比劫合计 ${(godCount(ctx, "比肩") + godCount(ctx, "劫财")).toFixed(1)}`],
+      tags: ["合作", "比劫"],
+    },
+    {
+      id: "yearly-step",
+      msg: "指定流年后，宜把年度趋势拆成阶段观察，先稳住基本盘再扩展。",
+      condition: (ctx) => !!ctx.algo.yearlyLuck,
+      evidence: (ctx) =>
+        ctx.algo.yearlyLuck
+          ? [`${ctx.algo.yearlyLuck.targetYear}年流年 ${ctx.algo.yearlyLuck.yearPillar}`]
+          : [],
+      tags: ["流年"],
+    },
   ];
-  return tips.map((msg, i) => ({
-    id: `advice-${i}`,
+  return tips.map((tip, i) => ({
+    id: `advice-${tip.id}`,
     category: "advice" as const,
-    priority: 50 + i,
-    condition: () => true,
-    score: 45 + (i % 10),
-    tags: ["建议"],
-    message: msg,
-    evidence: () => ["传统命理生活建议"],
+    priority: 64 - i,
+    condition: tip.condition,
+    score: 56 - (i % 8),
+    tags: ["建议", ...tip.tags],
+    message: tip.msg,
+    evidence: tip.evidence,
   }));
 }
 
@@ -426,7 +593,11 @@ function buildRelationRules(): Rule[] {
       score: 50,
       tags: ["平稳"],
       message: "命局地支结构相对平稳，内外节奏较易自我调节。",
-      evidence: () => ["无明显冲刑害"],
+      evidence: (ctx) => [
+        `地支冲 ${ctx.algo.branchRelations.clashes.length} 个`,
+        `地支害 ${ctx.algo.branchRelations.harms.length} 个`,
+        `地支刑 ${ctx.algo.branchRelations.punishments.length} 个`,
+      ],
     },
   ];
 }
@@ -440,9 +611,11 @@ function buildPatternRules(): Rule[] {
       condition: (ctx) => (ctx.algo.patternTendencies?.length ?? 0) > 0,
       score: 70,
       tags: ["格局倾向"],
-      message: "命局呈现一定格局倾向，可作性格与处事风格的参考，非绝对定论。",
+      message: "命局呈现格局倾向，可作性格与处事风格的参考，非绝对定论。",
       evidence: (ctx) =>
-        (ctx.algo.patternTendencies ?? []).slice(0, 3).map((p) => p.patternName),
+        (ctx.algo.patternTendencies ?? [])
+          .slice(0, 3)
+          .flatMap((p) => [`${p.patternName} 信心 ${p.confidence}%`, ...p.evidence.slice(0, 2)]),
     },
     {
       id: "useful-gods",
@@ -492,11 +665,15 @@ function buildFocusRules(): Rule[] {
     id: `focus-${area}`,
     category: (area === "overall" ? "personality" : area) as Rule["category"],
     priority: 90,
-    condition: (ctx) => ctx.focusArea === area,
+    condition: (ctx) => ctx.focusArea === area && !!ctx.algo.pillarStrings.day,
     score: 85,
     tags: ["关注方向", area],
     message: `当前关注方向为${areaLabel(area)}，以下解读将侧重该领域，其他维度仅作背景参考。`,
-    evidence: () => [`focusArea=${area}`],
+    evidence: (ctx) => [
+      `focusArea=${area}`,
+      `日主${ctx.algo.dayMasterStrength.dayMaster}`,
+      `四柱 ${Object.values(ctx.algo.pillarStrings).join(" ")}`,
+    ],
   }));
 }
 
@@ -564,11 +741,15 @@ function buildExtendedRules(): Rule[] {
         id: `area-tip-${area}-${i}`,
         category: area === "overall" ? "personality" : area,
         priority: 48 + i,
-        condition: (ctx) => ctx.focusArea === area,
+        condition: (ctx) => ctx.focusArea === area && !!ctx.algo.dayMasterStrength.dayMaster,
         score: 46,
         tags: [areaLabels[area]],
         message: `${areaLabels[area]}方向：保持节奏感，比追逐单次结果更能积累优势。`,
-        evidence: () => [`专项 ${area}`],
+        evidence: (ctx) => [
+          `专项 ${area}`,
+          `日主强弱 ${ctx.algo.dayMasterStrength.strengthLevel}`,
+          `最旺五行 ${ctx.algo.fiveElements.strongestElement}`,
+        ],
       });
     }
   }

@@ -1,4 +1,5 @@
 import type { BaziAlgorithmResult } from "../bazi";
+import type { EvidenceItem } from "./evidence";
 
 export type RuleCategory =
   | "personality"
@@ -23,5 +24,5 @@ export interface Rule {
   score: number;
   tags: string[];
   message: string;
-  evidence: (ctx: BaziRuleContext) => string[];
+  evidence: (ctx: BaziRuleContext) => Array<EvidenceItem | string>;
 }

@@ -134,7 +134,7 @@ export function analyzeLoveCompatibility(
         input: { personA: personA.name, personB: personB.name },
         method: "日主五行生克、日支合冲、天干关系、星座辅助",
         result: { matchScore: score },
-        notes: ["不输出必然结婚或分手结论"],
+        notes: ["不输出结婚或分手断语"],
       },
     ],
   };

@@ -18,7 +18,9 @@ const SAMPLE_INPUT = {
   focusArea: "overall" as const,
 };
 
-function getBazi(focusArea = "overall") {
+function getBazi(
+  focusArea: "overall" | "love" | "wealth" | "career" | "study" | "health" = "overall",
+) {
   const { algorithm_result } = computeBazi({ ...SAMPLE_INPUT, focusArea });
   return algorithm_result;
 }
@@ -103,7 +105,12 @@ describe("运势评分 luckScoring", () => {
         overview.overallLevel,
         ...overview.highlights,
         ...overview.cautions,
-        ...overview.scores.flatMap((s) => [s.summary, ...s.advice, ...s.evidence]),
+        ...overview.scores.flatMap((s) => [
+          s.summary,
+          s.detail,
+          ...s.advice,
+          ...s.evidence.map((e) => e.detail),
+        ]),
       ];
       for (const text of texts) {
         for (const word of FORBIDDEN) {

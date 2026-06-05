@@ -1,18 +1,34 @@
 import type { RuleResult } from "../shared/reportTypes";
 import type { BaziRuleContext, Rule, RuleCategory } from "./types";
+import {
+  confidenceFromEvidence,
+  evidenceWeight,
+  mergeEvidence,
+  normalizeEvidenceItems,
+} from "./evidence";
 
 const MAX_PER_CATEGORY = 8;
 
 function dedupeSimilar(results: RuleResult[]): RuleResult[] {
-  const seen = new Set<string>();
-  const out: RuleResult[] = [];
+  const byKey = new Map<string, RuleResult>();
   for (const r of results) {
     const key = `${r.category}:${r.message.slice(0, 24)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(r);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, r);
+      continue;
+    }
+
+    const evidence = mergeEvidence(existing.evidence, r.evidence);
+    byKey.set(key, {
+      ...existing,
+      score: Math.max(existing.score, r.score),
+      tags: [...new Set([...existing.tags, ...r.tags])],
+      evidence,
+      confidence: Math.max(existing.confidence, confidenceFromEvidence(evidence)),
+    });
   }
-  return out;
+  return [...byKey.values()];
 }
 
 export function runRuleEngine(
@@ -23,17 +39,30 @@ export function runRuleEngine(
 
   for (const rule of rules) {
     if (!rule.condition(context)) continue;
+    const evidence = normalizeEvidenceItems(rule.evidence(context), {
+      ruleId: rule.id,
+      category: rule.category,
+      tags: rule.tags,
+      baseWeight: Math.max(1, rule.priority / 25),
+    });
+    if (!evidence.length) continue;
+
     matched.push({
       ruleId: rule.id,
       category: rule.category,
       score: rule.score,
       message: rule.message,
-      evidence: rule.evidence(context),
+      evidence,
       tags: rule.tags,
+      confidence: confidenceFromEvidence(evidence),
     });
   }
 
-  matched.sort((a, b) => b.score - a.score);
+  matched.sort((a, b) => {
+    const byEvidence = evidenceWeight(b.evidence) - evidenceWeight(a.evidence);
+    if (Math.abs(byEvidence) > 0.01) return byEvidence;
+    return b.score - a.score;
+  });
 
   const byCategory = new Map<RuleCategory, RuleResult[]>();
   for (const r of matched) {
@@ -44,5 +73,9 @@ export function runRuleEngine(
   }
 
   const grouped = [...byCategory.values()].flat();
-  return dedupeSimilar(grouped).sort((a, b) => b.score - a.score);
+  return dedupeSimilar(grouped).sort((a, b) => {
+    const byEvidence = evidenceWeight(b.evidence) - evidenceWeight(a.evidence);
+    if (Math.abs(byEvidence) > 0.01) return byEvidence;
+    return b.confidence - a.confidence;
+  });
 }

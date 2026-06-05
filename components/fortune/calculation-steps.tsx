@@ -16,7 +16,17 @@ function formatResult(result: Record<string, unknown>): ReactNode {
         <div key={key} className="grid grid-cols-[minmax(6rem,30%)_1fr] gap-2 text-xs">
           <dt className="text-[var(--text-dim)]">{key}</dt>
           <dd className="break-words text-[var(--text-muted)]">
-            {typeof value === "object" && value !== null
+            {Array.isArray(value) &&
+            value.every((item) => item && typeof item === "object" && "detail" in item) ? (
+              <ul className="space-y-1">
+                {(value as Array<{ id?: string; title?: string; source?: string; detail?: string }>).slice(0, 12).map((item, index) => (
+                  <li key={item.id ?? index}>
+                    <span className="text-[var(--gold-main)]">{item.title ?? item.source ?? "依据"} · </span>
+                    {item.detail}
+                  </li>
+                ))}
+              </ul>
+            ) : typeof value === "object" && value !== null
               ? JSON.stringify(value, null, 0).slice(0, 120)
               : String(value).slice(0, 200)}
           </dd>

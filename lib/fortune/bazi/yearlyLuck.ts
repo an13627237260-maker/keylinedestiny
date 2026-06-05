@@ -95,7 +95,7 @@ export function analyzeYearlyLuck(
       input: { targetYear, focusArea },
       method: "以立春切换年柱（options 可扩展）；分析流年与原局、大运关系",
       result: analysis as unknown as Record<string, unknown>,
-      notes: ["流年解读为趋势参考，非必然事件"],
+      notes: ["流年解读为趋势参考，不作事件断语"],
     },
   };
 }
