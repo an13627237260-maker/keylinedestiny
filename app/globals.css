@@ -77,6 +77,8 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -85,6 +87,73 @@ body {
   color: var(--text-main);
   line-height: 1.75;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* prevent horizontal overflow from wide children */
+#__next,
+main {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 639px) {
+  .mystic-input,
+  .mystic-input[type="date"],
+  .mystic-input[type="time"],
+  select.mystic-input,
+  textarea.mystic-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* cosmic background mobile reduction */
+@media (max-width: 767px) {
+  .cosmic-stars {
+    opacity: 0.2 !important;
+  }
+  .cosmic-ring {
+    opacity: 0.03 !important;
+    animation: none !important;
+  }
+  .cosmic-orb {
+    opacity: 0.5;
+    filter: blur(24px) !important;
+    animation: none !important;
+  }
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--purple-primary);
+  outline-offset: 2px;
 }
 
 .font-display {

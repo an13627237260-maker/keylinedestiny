@@ -20,7 +20,7 @@ export function SectionTitle({
           {eyebrow}
         </p>
       )}
-      <h2 className="font-display text-2xl font-semibold text-[var(--text-main)] md:text-3xl">
+      <h2 className="font-display text-2xl font-semibold text-[var(--text-main)] sm:text-3xl">
         {title}
       </h2>
       <div className={cn("gold-line", centered && "mx-auto")} />

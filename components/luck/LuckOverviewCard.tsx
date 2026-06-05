@@ -99,7 +99,7 @@ export function LuckOverviewCard({
           <div className="text-center sm:text-left">
             <p className="text-xs font-medium text-[var(--text-dim)]">综合分数</p>
             <div className="mt-1 flex items-baseline justify-center gap-1 sm:justify-start">
-              <span className="font-display text-5xl font-bold text-[var(--gold-main)]">
+              <span className="font-display text-3xl font-bold text-[var(--gold-main)] sm:text-5xl">
                 {displayScore}
               </span>
               <span className="text-sm text-[var(--text-dim)]">分</span>

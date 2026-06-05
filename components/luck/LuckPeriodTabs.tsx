@@ -18,14 +18,14 @@ export function LuckPeriodTabs({
   onChange: (p: LuckPeriod) => void;
 }) {
   return (
-    <div className="flex items-center gap-1 border-b border-[var(--border-soft)] pb-3">
+    <div className="-mx-1 flex items-center gap-1 overflow-x-auto border-b border-[var(--border-soft)] px-1 pb-3 scrollbar-none">
       {TABS.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            "relative px-4 py-1.5 text-sm font-medium transition-colors",
+            "relative shrink-0 px-4 py-2 text-sm font-medium transition-colors min-h-[44px]",
             value === tab.id
               ? "text-[var(--gold-main)]"
               : "text-[var(--text-dim)] hover:text-[var(--text-muted)]",

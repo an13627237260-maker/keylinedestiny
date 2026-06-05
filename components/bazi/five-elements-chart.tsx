@@ -1,5 +1,6 @@
 "use client";
 
+import { ElementBarsMobile } from "@/components/bazi/ElementBarsMobile";
 import {
   BarChart,
   Bar,
@@ -39,8 +40,14 @@ export function FiveElementsChart({
   const low = weakestElement ?? sorted[sorted.length - 1]?.name;
 
   return (
-    <div className="space-y-4">
-      <div className="h-72 w-full">
+    <div className="max-w-full space-y-4 overflow-hidden">
+      <ElementBarsMobile
+        percentages={percentages}
+        strongestElement={strongestElement}
+        weakestElement={weakestElement}
+        balanceScore={balanceScore}
+      />
+      <div className="hidden h-72 w-full max-w-full md:block">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
             <XAxis dataKey="name" stroke="#a1a1aa" tick={{ fill: "#d4d4d8" }} />

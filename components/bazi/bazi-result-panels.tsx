@@ -33,19 +33,19 @@ export function BaziResultPanels({
 }) {
   return (
     <motion.div
-      className="space-y-5"
+      className="space-y-4 md:space-y-5"
       variants={staggerContainer}
       initial="initial"
       animate="animate"
     >
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
+        <LuckOverviewCard baziResult={algo} focusArea={focusArea} />
+      </motion.div>
+      <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <BaziOverviewCard algo={algo} />
       </motion.div>
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <LocationInfluenceCard algo={algo} />
-      </motion.div>
-      <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
-        <LuckOverviewCard baziResult={algo} focusArea={focusArea} />
       </motion.div>
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <CoreMetricsRow algo={algo} />

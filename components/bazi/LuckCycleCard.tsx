@@ -22,8 +22,37 @@ export function LuckCycleCard({ algo }: { algo: BaziAlgorithmResult }) {
             {labelLuckDirection(lc.direction)} · 起运约{" "}
             <span className="text-[var(--gold-main)]">{lc.startAge}</span> 岁
           </p>
-          <div className="overflow-x-auto -mx-1 px-1">
-            <table className="w-full min-w-[480px] text-left text-sm">
+
+          {/* Mobile: timeline cards */}
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 scrollbar-none md:hidden">
+            {lc.cycles.map((c, i) => (
+              <div
+                key={c.index}
+                className={`min-w-[120px] shrink-0 rounded-xl border px-3 py-3 text-center ${
+                  i === currentIdx
+                    ? "border-[var(--gold-main)]/50 bg-[rgba(214,181,109,0.08)]"
+                    : "border-[var(--border-soft)] bg-[rgba(8,6,17,0.4)]"
+                }`}
+              >
+                <p className="text-[10px] text-[var(--text-dim)]">第 {c.index} 步</p>
+                <p className="mt-1 font-display text-xl font-bold text-[var(--gold-soft)]">
+                  {c.pillar.stem}
+                  {c.pillar.branch}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">{c.stemTenGod}</p>
+                <p className="mt-2 text-[10px] text-[var(--text-dim)]">
+                  {c.startAge}-{c.endAge} 岁
+                </p>
+                <p className="text-[10px] text-[var(--text-dim)]">
+                  {c.startYear}-{c.endYear}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-0 text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-soft)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
                   <th className="py-2 pr-3">步</th>
@@ -38,9 +67,7 @@ export function LuckCycleCard({ algo }: { algo: BaziAlgorithmResult }) {
                   <tr
                     key={c.index}
                     className={`border-b border-[rgba(255,255,255,0.04)] ${
-                      i === currentIdx
-                        ? "bg-[rgba(214,181,109,0.08)]"
-                        : ""
+                      i === currentIdx ? "bg-[rgba(214,181,109,0.08)]" : ""
                     }`}
                   >
                     <td className="py-2.5 pr-3 text-[var(--text-dim)]">{c.index}</td>

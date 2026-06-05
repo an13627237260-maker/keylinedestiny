@@ -21,13 +21,13 @@ export function MysticCard({
   return (
     <div
       className={cn(
-        "glass-card group rounded-2xl transition-all duration-300 hover:border-[rgba(214,181,109,0.35)]",
+        "glass-card group max-w-full rounded-2xl transition-all duration-300 hover:border-[rgba(214,181,109,0.35)] md:rounded-3xl",
         highlighted && "border-[rgba(214,181,109,0.4)] shadow-[0_0_24px_rgba(139,92,246,0.12)]",
         className,
       )}
     >
       {(title || description) && (
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-soft)] px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-soft)] px-4 py-3 md:px-5 md:py-4">
           <div className="flex gap-3">
             {Icon && (
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-purple)] bg-[rgba(139,92,246,0.08)]">
@@ -48,7 +48,7 @@ export function MysticCard({
           {headerAction}
         </div>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-4 md:p-5">{children}</div>
     </div>
   );
 }

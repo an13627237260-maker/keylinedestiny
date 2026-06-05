@@ -25,7 +25,7 @@ export function LuckScoreBars({
             type="button"
             onClick={() => onSelect(item.category as Exclude<LuckCategory, "overall">)}
             className={cn(
-              "flex min-w-[56px] shrink-0 flex-col items-center gap-1.5 rounded-xl px-2 py-2 transition-all sm:min-w-0 sm:flex-1",
+              "flex min-w-[72px] shrink-0 flex-col items-center gap-1.5 rounded-xl px-2 py-2 transition-all min-h-[44px] sm:min-w-0 sm:flex-1",
               active && "bg-[rgba(139,92,246,0.08)] ring-1 ring-[rgba(214,181,109,0.25)]",
             )}
           >

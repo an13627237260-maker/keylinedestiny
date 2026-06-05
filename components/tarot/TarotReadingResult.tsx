@@ -1,4 +1,5 @@
 import { MysticCard } from "@/components/ui/mystic-card";
+import { ReportSections } from "@/components/ui/ReportSections";
 import { TarotCardUI } from "./TarotCard";
 import { CalculationStepsCard } from "@/components/bazi/CalculationStepsCard";
 import type { CalculationStep } from "@/lib/fortune/shared/types";
@@ -14,10 +15,10 @@ export function TarotReadingResult({
   steps: CalculationStep[];
 }) {
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-4 md:space-y-6">
+      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 scrollbar-none md:grid md:grid-cols-2 md:gap-6 md:overflow-visible lg:grid-cols-3">
         {cards.map((c, i) => (
-          <MysticCard key={i} className="text-center">
+          <MysticCard key={i} className="min-w-[140px] shrink-0 text-center md:min-w-0">
             <TarotCardUI
               name={c.card.nameCn}
               position={c.position}
@@ -29,14 +30,9 @@ export function TarotReadingResult({
       </div>
 
       <MysticCard title="牌阵解读" description="规则引擎趋势分析" highlighted>
-        <p className="text-sm text-[var(--text-main)]">{report.summary}</p>
-        <div className="mt-6 space-y-6">
-          {report.sections.map((s) => (
-            <div key={s.title}>
-              <h4 className="font-display text-sm text-[var(--gold-main)]">{s.title}</h4>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">{s.content}</p>
-            </div>
-          ))}
+        <p className="text-sm leading-7 text-[var(--text-main)]">{report.summary}</p>
+        <div className="mt-4">
+          <ReportSections report={report} />
         </div>
       </MysticCard>
 

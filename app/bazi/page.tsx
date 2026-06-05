@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AppShell } from "@/components/layout/AppShell";
 import { SectionTitle } from "@/components/ui/section-title";
@@ -30,6 +30,13 @@ export default function BaziPage() {
     report: FortuneReport;
     input?: { focusArea?: string };
   } | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (result && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [result]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -93,26 +100,29 @@ export default function BaziPage() {
 
   return (
     <AppShell>
-      <div className="mb-8">
+      <div className="mb-4 md:mb-8">
         <SectionTitle
           eyebrow="生辰八字"
           title="生辰八字测算"
           subtitle="以节气、四柱、五行、十神、大运为基础，由本地规则引擎生成可复核的命理报告"
         />
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 md:mt-4">
           <PillBadge variant="purple">本地规则引擎</PillBadge>
           <PillBadge variant="gold">计算过程可展开</PillBadge>
           <PillBadge variant="muted">传统命理模型</PillBadge>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,38%)_minmax(0,62%)]">
+      <div className="grid grid-cols-1 gap-4 md:gap-8 lg:grid-cols-[minmax(0,38%)_minmax(0,62%)]">
         <BaziForm loading={loading} onSubmit={onSubmit} />
-        <div>
+        <div ref={resultsRef} className="min-w-0">
           {error && (
             <p className="mb-4 rounded-lg border border-[var(--danger)]/30 bg-[rgba(224,107,107,0.08)] px-4 py-3 text-sm text-[var(--danger)]">
               {error}
             </p>
+          )}
+          {loading && !result && (
+            <p className="mb-4 text-center text-sm text-[var(--text-muted)]">正在校准节气与四柱…</p>
           )}
           {result ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

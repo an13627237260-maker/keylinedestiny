@@ -19,7 +19,7 @@ function MysticInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cn(
-        "mystic-input h-10 w-full rounded-lg px-3 text-sm",
+        "mystic-input min-h-[44px] w-full rounded-lg px-3 text-base sm:text-sm",
         props.className,
       )}
     />
@@ -31,7 +31,7 @@ function MysticSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className={cn(
-        "mystic-input h-10 w-full rounded-lg px-3 text-sm",
+        "mystic-input min-h-[44px] w-full rounded-lg px-3 text-base sm:text-sm",
         props.className,
       )}
     />
@@ -102,7 +102,7 @@ export function BaziForm({
         {manualLon && <input type="hidden" name="manualLongitude" value={manualLon} />}
         {manualLat && <input type="hidden" name="manualLatitude" value={manualLat} />}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormFieldShell label="姓名（可选）" htmlFor="name">
             <MysticInput id="name" name="name" placeholder="可选" />
           </FormFieldShell>
@@ -227,7 +227,7 @@ export function BaziForm({
         </button>
 
         {advancedOpen && (
-          <div className="grid gap-4 rounded-xl border border-[var(--border-soft)] p-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 rounded-xl border border-[var(--border-soft)] p-4 md:grid-cols-2">
             <FormFieldShell label="手动经度" htmlFor="manualLon" description="覆盖城市默认值">
               <MysticInput
                 id="manualLon"
@@ -266,7 +266,7 @@ export function BaziForm({
           type="submit"
           variant="primary"
           loading={loading}
-          className="w-full sm:w-auto"
+          className="w-full"
         >
           {loading ? "正在校准节气与四柱…" : "开始排盘"}
         </MysticButton>
