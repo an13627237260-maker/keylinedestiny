@@ -86,6 +86,16 @@ export default function ReportsPage() {
                       <h3 className="font-display font-semibold text-[var(--text-main)]">{r.title}</h3>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm text-[var(--text-muted)]">{r.summary}</p>
+                    {r.type === "bazi" && (r.payload as { luckOverview?: { day?: { overallScore: number; overallLevel: string } } }).luckOverview?.day && (
+                      <p className="mt-2 text-xs text-[var(--text-dim)]">
+                        当日运势{" "}
+                        <span className="font-display text-[var(--gold-main)]">
+                          {(r.payload as { luckOverview: { day: { overallScore: number } } }).luckOverview.day.overallScore}
+                        </span>{" "}
+                        分 ·{" "}
+                        {(r.payload as { luckOverview: { day: { overallLevel: string } } }).luckOverview.day.overallLevel}
+                      </p>
+                    )}
                     <p className="mt-2 text-[10px] text-[var(--text-dim)]">
                       {new Date(r.createdAt).toLocaleString()}
                     </p>

@@ -1,0 +1,63 @@
+export type LuckPeriod = "day" | "week" | "month" | "year";
+
+export type LuckCategory =
+  | "overall"
+  | "love"
+  | "wealth"
+  | "career"
+  | "study"
+  | "social";
+
+export interface LuckScore {
+  category: LuckCategory;
+  label: string;
+  score: number;
+  level: string;
+  color: string;
+  keywords: string[];
+  summary: string;
+  advice: string[];
+  evidence: string[];
+}
+
+export interface LuckOverview {
+  period: LuckPeriod;
+  dateLabel: string;
+  startDate: string;
+  endDate: string;
+  overallScore: number;
+  overallLevel: string;
+  scores: LuckScore[];
+  highlights: string[];
+  cautions: string[];
+  calculationBasis: string[];
+}
+
+export interface LuckOverviewSet {
+  day: LuckOverview;
+  week: LuckOverview;
+  month: LuckOverview;
+  year: LuckOverview;
+}
+
+export const LUCK_CATEGORY_COLORS: Record<
+  Exclude<LuckCategory, "overall">,
+  string
+> = {
+  love: "#EC6FAE",
+  wealth: "#D6B56D",
+  career: "#6C91E8",
+  study: "#41C7D9",
+  social: "#B56BE8",
+};
+
+export const LUCK_CATEGORY_LABELS: Record<
+  Exclude<LuckCategory, "overall">,
+  string
+> = {
+  love: "爱情",
+  wealth: "财富",
+  career: "事业",
+  study: "学习",
+  social: "人际",
+};

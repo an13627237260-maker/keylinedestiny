@@ -5,6 +5,7 @@ import { staggerContainer } from "@/lib/motion";
 import type { CalculationStep } from "@/lib/fortune/shared/types";
 import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 import type { BaziAlgorithmResult } from "@/lib/fortune/bazi";
+import { LuckOverviewCard } from "@/components/luck/LuckOverviewCard";
 import { BaziOverviewCard } from "./BaziOverviewCard";
 import { CoreMetricsRow } from "./CoreMetricsRow";
 import { ElementDistributionCard } from "./ElementDistributionCard";
@@ -38,6 +39,9 @@ export function BaziResultPanels({
     >
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <BaziOverviewCard algo={algo} />
+      </motion.div>
+      <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
+        <LuckOverviewCard baziResult={algo} focusArea={focusArea} />
       </motion.div>
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <CoreMetricsRow algo={algo} />

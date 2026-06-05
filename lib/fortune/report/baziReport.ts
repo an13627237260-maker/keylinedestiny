@@ -1,4 +1,5 @@
 import type { BaziAlgorithmResult } from "../bazi";
+import { generateAllLuckOverviews } from "../luck";
 import { labelFocusArea, labelStrength } from "../shared/labels";
 import type { FortuneReport, RuleResult } from "../shared/reportTypes";
 import type { BaziInput } from "../shared/validation";
@@ -197,6 +198,30 @@ function sectionMonthly(algo: BaziAlgorithmResult): string {
   return joinParagraphs(m.map((x) => x.hint));
 }
 
+function sectionLuckOverview(
+  algo: BaziAlgorithmResult,
+  focusArea: string,
+): string {
+  const all = generateAllLuckOverviews(algo, focusArea);
+  const day = all.day;
+  const sorted = [...day.scores].sort((a, b) => b.score - a.score);
+  const best = sorted[0];
+  const weakest = sorted[sorted.length - 1];
+  const actions = sorted
+    .flatMap((s) => s.advice.slice(0, 1))
+    .slice(0, 3);
+
+  return joinParagraphs([
+    `今日综合运势 ${day.overallScore} 分（${day.overallLevel}），本周 ${all.week.overallScore} 分，本月 ${all.month.overallScore} 分，今年 ${all.year.overallScore} 分。`,
+    `当前较强方向为${best.label}（${best.score} 分），${best.summary.slice(0, 80)}…`,
+    weakest.score < 68
+      ? `宜多留意${weakest.label}（${weakest.score} 分）：${weakest.advice[0] ?? "放慢节奏、稳中求进"}。`
+      : "各分项整体较均衡，可按计划稳步推进。",
+    `行动参考：${actions.join("；")}。`,
+    day.cautions[0] ?? "",
+  ]);
+}
+
 function buildAdvice(algo: BaziAlgorithmResult, rules: RuleResult[]): string[] {
   const fromRules = rulesToBullets(rules, "advice", 8);
   const extra = [
@@ -231,6 +256,10 @@ export function generateBaziReport(
         `五行气势：${algo.fiveElements.strongestElement}偏旺，${algo.fiveElements.weakestElement}偏弱`,
         summary,
       ]),
+    },
+    {
+      title: "近期运势概览",
+      content: sectionLuckOverview(algo, focusArea),
     },
     {
       title: "五行格局",

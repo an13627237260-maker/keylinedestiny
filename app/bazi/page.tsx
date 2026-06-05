@@ -15,6 +15,7 @@ import { generateBaziReport } from "@/lib/fortune/report/baziReport";
 import { toErrorResponse } from "@/lib/fortune/shared/errors";
 import { validateTimezone } from "@/lib/fortune/shared/time";
 import { baziInputSchema } from "@/lib/fortune/shared/validation";
+import { generateAllLuckOverviews } from "@/lib/fortune/luck";
 import { saveReport } from "@/lib/storage/localReports";
 import type { BaziAlgorithmResult } from "@/lib/fortune/bazi";
 import type { CalculationStep } from "@/lib/fortune/shared/types";
@@ -56,15 +57,22 @@ export default function BaziPage() {
       const { algorithm_result, calculation_steps, warnings } = computeBazi(input);
       const rule_results = runBaziRules(algorithm_result, input.focusArea);
       const report = generateBaziReport(algorithm_result, rule_results, input);
-      const data = buildFortuneSuccess(
-        "bazi",
-        input,
+      const luckOverview = generateAllLuckOverviews(
         algorithm_result,
-        calculation_steps,
-        report,
-        rule_results,
-        warnings,
+        input.focusArea,
       );
+      const data = {
+        ...buildFortuneSuccess(
+          "bazi",
+          input,
+          algorithm_result,
+          calculation_steps,
+          report,
+          rule_results,
+          warnings,
+        ),
+        luckOverview,
+      };
 
       setResult(data);
       saveReport("bazi", data);
