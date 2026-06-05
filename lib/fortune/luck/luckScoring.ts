@@ -1,66 +1,55 @@
 import type { BaziAlgorithmResult } from "../bazi";
 import { computeLocationLuckDelta } from "../location/regionElements";
-import { analyzeBranchRelations } from "../bazi/branchRelations";
-import {
-  ELEMENT_GENERATES,
-  STEM_ELEMENT,
-  type EarthlyBranch,
-  type FiveElement,
-} from "../bazi/constants";
-import {
-  getDayPillarIndex,
-  getSexagenary,
-  getYearPillarIndex,
-  pillarToString,
-  type Pillar,
-} from "../bazi/ganzhi";
-import {
-  EARTHLY_BRANCHES,
-  HEAVENLY_STEMS,
-  MONTH_BRANCHES,
-  YEAR_STEM_TO_YIN_MONTH_STEM,
-} from "../bazi/constants";
-import { advanceStem } from "../bazi/ganzhi";
-import { getTenGod, type TenGod } from "../bazi/tenGods";
-import type { FourPillars } from "../bazi/pillars";
+import { pillarToString } from "../bazi/ganzhi";
+import { getTenGod } from "../bazi/tenGods";
 import {
   buildHighlightsAndCautions,
   buildLuckScore,
+  buildPeriodInsights,
+  buildTransitSummary,
   scoreToLevel,
 } from "./luckText";
+import {
+  formatDate,
+  resolveLuckPeriodRange,
+  getPeriodRange,
+} from "./periodResolver";
+import {
+  calculateTransitContext,
+  deterministicTransitHash,
+  getMonthPillarForCalendarMonth,
+  type TransitContext,
+} from "./transitCalculator";
 import type {
   LuckCategory,
   LuckOverview,
   LuckPeriod,
   LuckScore,
 } from "./types";
+
 const SCORE_MIN = 42;
 const SCORE_MAX = 96;
 const BASE_SCORE = 70;
 
 type SubCategory = Exclude<LuckCategory, "overall">;
 
+const SUB_CATEGORIES: SubCategory[] = [
+  "love",
+  "wealth",
+  "career",
+  "study",
+  "social",
+];
+
 export interface GenerateLuckOverviewInput {
   baziResult: BaziAlgorithmResult;
   targetDate?: Date;
   period: LuckPeriod;
   focusArea?: string;
-  /** 时间轴偏移：日=±天，周=±周，月=±月，年=±年 */
   timelineOffset?: number;
 }
 
-interface FlowContext {
-  period: LuckPeriod;
-  startDate: Date;
-  endDate: Date;
-  dayPillars: Pillar[];
-  monthPillar?: Pillar;
-  yearPillar?: Pillar;
-  yearStemTenGod?: TenGod;
-  dayStemTenGods: TenGod[];
-}
-
-function clampScore(n: number): number {
+export function clampScore(n: number): number {
   return Math.round(Math.max(SCORE_MIN, Math.min(SCORE_MAX, n)));
 }
 
@@ -68,153 +57,7 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatDateLabel(d: Date): string {
-  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-  return `${weekdays[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
-}
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return startOfDay(r);
-}
-
-function addMonths(d: Date, n: number): Date {
-  const r = new Date(d.getFullYear(), d.getMonth() + n, 1);
-  return r;
-}
-
-function getMonthRange(date: Date, offsetMonths = 0): { start: Date; end: Date } {
-  const d = addMonths(date, offsetMonths);
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return { start: startOfDay(start), end: startOfDay(end) };
-}
-
-function getWeekRange(date: Date, offsetWeeks = 0): { start: Date; end: Date } {
-  const d = addDays(date, offsetWeeks * 7);
-  const day = d.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const start = addDays(d, mondayOffset);
-  const end = addDays(start, 6);
-  return { start, end };
-}
-
-function getYearRange(date: Date, offsetYears = 0): { start: Date; end: Date } {
-  const y = date.getFullYear() + offsetYears;
-  return {
-    start: new Date(y, 0, 1),
-    end: new Date(y, 11, 31),
-  };
-}
-
-function getPeriodRange(
-  period: LuckPeriod,
-  targetDate: Date,
-  offset = 0,
-): { start: Date; end: Date } {
-  switch (period) {
-    case "day":
-      return { start: addDays(targetDate, offset), end: addDays(targetDate, offset) };
-    case "week":
-      return getWeekRange(targetDate, offset);
-    case "month":
-      return getMonthRange(targetDate, offset);
-    case "year":
-      return getYearRange(targetDate, offset);
-  }
-}
-
-function getDayPillarForDate(date: Date): Pillar {
-  return getSexagenary(
-    getDayPillarIndex(date.getFullYear(), date.getMonth() + 1, date.getDate()),
-  );
-}
-
-function getMonthPillar(year: number, month: number): Pillar {
-  const yearStem = getSexagenary(getYearPillarIndex(year)).stem;
-  const yinStem = YEAR_STEM_TO_YIN_MONTH_STEM[yearStem];
-  const stem = advanceStem(yinStem, month - 1);
-  const branch = MONTH_BRANCHES[month - 1];
-  const stemIdx = HEAVENLY_STEMS.indexOf(stem);
-  const branchIdx = EARTHLY_BRANCHES.indexOf(branch);
-  for (let i = 0; i < 60; i++) {
-    if (i % 10 === stemIdx && i % 12 === branchIdx) {
-      return { stem, branch, index: i };
-    }
-  }
-  return { stem, branch, index: 0 };
-}
-
-function enumerateDays(start: Date, end: Date): Date[] {
-  const days: Date[] = [];
-  let cur = start;
-  while (cur <= end) {
-    days.push(new Date(cur));
-    cur = addDays(cur, 1);
-  }
-  return days;
-}
-
-function buildFlowContext(
-  period: LuckPeriod,
-  start: Date,
-  end: Date,
-): FlowContext {
-  const days = enumerateDays(start, end);
-  const dayPillars = days.map(getDayPillarForDate);
-  const refYear = start.getFullYear();
-  const refMonth = start.getMonth() + 1;
-
-  const monthPillar = getMonthPillar(refYear, refMonth);
-  const yearPillar = getSexagenary(getYearPillarIndex(refYear));
-
-  return {
-    period,
-    startDate: start,
-    endDate: end,
-    dayPillars,
-    monthPillar,
-    yearPillar,
-    yearStemTenGod: undefined,
-    dayStemTenGods: [],
-  };
-}
-
-function branchesClash(a: EarthlyBranch, b: EarthlyBranch): boolean {
-  const pairs: Array<[EarthlyBranch, EarthlyBranch]> = [
-    ["子", "午"], ["丑", "未"], ["寅", "申"], ["卯", "酉"], ["辰", "戌"], ["巳", "亥"],
-  ];
-  return pairs.some(
-    ([x, y]) => (x === a && y === b) || (x === b && y === a),
-  );
-}
-
-function branchesCombine(a: EarthlyBranch, b: EarthlyBranch): boolean {
-  const pairs: Array<[EarthlyBranch, EarthlyBranch]> = [
-    ["子", "丑"], ["寅", "亥"], ["卯", "戌"], ["辰", "酉"], ["巳", "申"], ["午", "未"],
-  ];
-  return pairs.some(
-    ([x, y]) => (x === a && y === b) || (x === b && y === a),
-  );
-}
-
-function elementSupports(helper: FiveElement, target: FiveElement): boolean {
-  return helper === target || ELEMENT_GENERATES[helper] === target;
-}
-
-function findStar(bazi: BaziAlgorithmResult, name: string): boolean {
-  return bazi.symbolicStars.some((s) => s.name === name && s.found);
-}
-
-function getCategoryWeights(focusArea?: string): Record<SubCategory, number> {
+export function getCategoryWeights(focusArea?: string): Record<SubCategory, number> {
   const w: Record<SubCategory, number> = {
     love: 0.2,
     wealth: 0.2,
@@ -235,423 +78,386 @@ function getCategoryWeights(focusArea?: string): Record<SubCategory, number> {
   w[key] = 0.35;
   const remaining = 1 - 0.35;
   const othersSum = 1 - old;
-  for (const k of Object.keys(w) as SubCategory[]) {
+  for (const k of SUB_CATEGORIES) {
     if (k !== key) w[k] = (w[k] / othersSum) * remaining;
   }
   return w;
 }
 
-function scoreLove(bazi: BaziAlgorithmResult, flow: FlowContext, focusArea?: string): {
-  score: number;
-  evidence: string[];
-} {
-  let score = BASE_SCORE;
-  const evidence: string[] = [];
-  const dm = bazi.pillars.day.stem;
-  const dayBranch = bazi.pillars.day.branch;
-  const tg = bazi.tenGods.counts;
-
-  if (findStar(bazi, "桃花") || findStar(bazi, "红鸾") || findStar(bazi, "天喜")) {
-    score += 5;
-    evidence.push("命局带桃花或喜庆标签，人缘与表达感较活跃");
+function weekdayCategoryWeight(dayOfWeek: number, cat: SubCategory): number {
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  if (isWeekend) {
+    if (cat === "love" || cat === "social") return 1.15;
+    if (cat === "career" || cat === "study") return 0.9;
+  } else {
+    if (cat === "career" || cat === "study") return 1.1;
+    if (cat === "love" || cat === "social") return 0.95;
   }
-  if (findStar(bazi, "咸池")) {
-    score += 3;
-    evidence.push("咸池主魅力与人缘，情感互动更容易被看见");
-  }
-
-  for (const pillar of flow.dayPillars) {
-    if (branchesCombine(pillar.branch, dayBranch)) {
-      score += 5;
-      evidence.push(`流日地支${pillar.branch}与日支${dayBranch}相合，关系沟通感较顺`);
-    }
-    if (branchesClash(pillar.branch, dayBranch)) {
-      score -= 7;
-      evidence.push(`流日地支${pillar.branch}冲日支${dayBranch}，情绪敏感点需留意`);
-    }
-    const tenGod = getTenGod(dm, pillar.stem);
-    if (tenGod === "正财" || tenGod === "偏财") score += 3;
-    if (tenGod === "正官" || tenGod === "七杀") score += 2;
-  }
-
-  if ((tg["伤官"] ?? 0) > 2) {
-    score -= 5;
-    evidence.push("伤官偏强，表达可能较直接，宜注意语气");
-  }
-  if ((tg["比肩"] ?? 0) + (tg["劫财"] ?? 0) > 3) {
-    score -= 4;
-    evidence.push("比劫偏旺，自我感较强，关系中宜多倾听");
-  }
-
-  const ug = bazi.usefulGods;
-  if (ug && flow.monthPillar) {
-    const monthEl = STEM_ELEMENT[flow.monthPillar.stem];
-    if (ug.usefulElementTendency.includes(monthEl)) {
-      score += 6;
-      evidence.push(`流月五行${monthEl}与喜用倾向一致，感情节奏更和谐`);
-    }
-  }
-
-  if (focusArea === "love") score += 4;
-
-  return { score: clampScore(score), evidence };
+  return 1;
 }
 
-function scoreWealth(bazi: BaziAlgorithmResult, flow: FlowContext, focusArea?: string): {
-  score: number;
-  evidence: string[];
-} {
-  let score = BASE_SCORE;
-  const evidence: string[] = [];
+function scoreLayerFromTransit(
+  bazi: BaziAlgorithmResult,
+  transit: TransitContext,
+  category: SubCategory,
+  layer: "luck" | "year" | "month" | "day",
+): number {
+  let delta = 0;
   const dm = bazi.pillars.day.stem;
   const dmStrength = bazi.dayMasterStrength.strengthLevel;
-  const tg = bazi.tenGods.counts;
 
-  const wealthGods = (tg["正财"] ?? 0) + (tg["偏财"] ?? 0);
-  const outputGods = (tg["食神"] ?? 0) + (tg["伤官"] ?? 0);
+  const pillar =
+    layer === "year"
+      ? transit.year
+      : layer === "month"
+        ? transit.month
+        : layer === "day"
+          ? transit.day
+          : null;
 
-  if (wealthGods > 0 && outputGods > 0) {
-    score += 6;
-    evidence.push("食伤生财结构存在，资源流动有生成链条");
-  }
-  if (wealthGods > 2 && dmStrength === "weak") {
-    score -= 6;
-    evidence.push("财星偏旺而日主偏弱，担财压力需留意");
-  }
-  if ((tg["比肩"] ?? 0) + (tg["劫财"] ?? 0) > 2.5) {
-    score -= 5;
-    evidence.push("比劫偏旺，开支竞争感可能增强");
-  }
-
-  for (const pillar of flow.dayPillars) {
-    const tenGod = getTenGod(dm, pillar.stem);
-    if (tenGod === "正财" || tenGod === "偏财") {
-      score += 4;
-      evidence.push(`流日十神${tenGod}，财务主题容易被触发`);
+  if (layer === "luck" && transit.currentLuckCycle) {
+    const god = transit.currentLuckCycle.stemTenGod;
+    delta += categorySignalFromTenGod(god, category, dmStrength, bazi);
+    for (const r of transit.relations.luckRelations) {
+      delta += relationDelta(r.type, category);
     }
+    return delta;
   }
 
-  if (flow.monthPillar) {
-    const mGod = getTenGod(dm, flow.monthPillar.stem);
-    if (mGod === "正财" || mGod === "偏财") {
-      score += 5;
-      evidence.push(`流月十神${mGod}，适合整理账目与规划`);
-    }
+  if (!pillar) return 0;
+
+  delta += categorySignalFromTenGod(pillar.stemTenGod, category, dmStrength, bazi);
+
+  const rels =
+    layer === "year"
+      ? transit.relations.yearRelations
+      : layer === "month"
+        ? transit.relations.monthRelations
+        : transit.relations.dayRelations;
+
+  for (const r of rels) {
+    delta += relationDelta(r.type, category, r.natal);
   }
 
-  if (findStar(bazi, "禄神")) {
-    score += 3;
-    evidence.push("禄神有助稳定资源感");
-  }
+  const useful = bazi.usefulGods?.usefulElementTendency ?? [];
+  const avoid = bazi.usefulGods?.avoidElementTendency ?? [];
+  if (useful.includes(pillar.stemElement)) delta += 3;
+  if (avoid.includes(pillar.stemElement)) delta -= 3;
 
-  if (focusArea === "wealth") score += 4;
-
-  return { score: clampScore(score), evidence };
+  return delta;
 }
 
-function scoreCareer(bazi: BaziAlgorithmResult, flow: FlowContext, focusArea?: string): {
-  score: number;
-  evidence: string[];
-} {
-  let score = BASE_SCORE;
-  const evidence: string[] = [];
-  const dm = bazi.pillars.day.stem;
-  const tg = bazi.tenGods.counts;
-  const monthBranch = bazi.pillars.month.branch;
-
-  const officer = (tg["正官"] ?? 0) + (tg["七杀"] ?? 0);
-  const seal = (tg["正印"] ?? 0) + (tg["偏印"] ?? 0);
-
-  if (officer > 0 && seal > 0) {
-    score += 7;
-    evidence.push("官印相生倾向，工作推进有支撑");
-  }
-  if ((tg["伤官"] ?? 0) > 1.5 && officer > 1) {
-    score -= 6;
-    evidence.push("伤官见官压力，沟通方式宜圆融");
-  }
-  if (officer > 2.5) {
-    score -= 4;
-    evidence.push("官杀偏旺，职场节奏可能偏紧");
-  }
-
-  for (const pillar of flow.dayPillars) {
-    if (branchesClash(pillar.branch, monthBranch)) {
-      score -= 6;
-      evidence.push(`流日冲月支${monthBranch}，事业环境可能有波动感`);
-    }
-    const tenGod = getTenGod(dm, pillar.stem);
-    if (tenGod === "正官" || tenGod === "七杀") score += 3;
-  }
-
-  if (flow.yearPillar) {
-    const yGod = getTenGod(dm, flow.yearPillar.stem);
-    if (yGod === "正官" || yGod === "七杀") {
-      score += 4;
-      evidence.push(`流年十神${yGod}，职业主题被引动`);
-    }
-  }
-
-  const lc = bazi.luckCycle;
-  if (lc?.cycles.length && flow.yearPillar) {
-    const yr = flow.startDate.getFullYear();
-    const current = lc.cycles.find((c) => yr >= c.startYear && yr < c.endYear);
-    if (current && (current.stemTenGod === "正官" || current.stemTenGod === "正印")) {
-      score += 5;
-      evidence.push(`当前大运${pillarToString(current.pillar)}利事业推进`);
-    }
-  }
-
-  if (focusArea === "career") score += 4;
-
-  return { score: clampScore(score), evidence };
-}
-
-function scoreStudy(bazi: BaziAlgorithmResult, flow: FlowContext, focusArea?: string): {
-  score: number;
-  evidence: string[];
-} {
-  let score = BASE_SCORE;
-  const evidence: string[] = [];
-  const dm = bazi.pillars.day.stem;
-  const tg = bazi.tenGods.counts;
-
-  const seal = (tg["正印"] ?? 0) + (tg["偏印"] ?? 0);
-  const output = (tg["食神"] ?? 0) + (tg["伤官"] ?? 0);
-
-  if (seal > 1) {
-    score += 6;
-    evidence.push("印星有力，利吸收与记忆");
-  }
-  if (findStar(bazi, "文昌贵人")) {
-    score += 5;
-    evidence.push("文昌贵人触发，学习输出感较佳");
-  }
-  if (output > 2.5) {
-    score -= 5;
-    evidence.push("食伤过旺，注意力可能易分散");
-  }
-  if ((tg["正财"] ?? 0) + (tg["偏财"] ?? 0) > 2) {
-    score -= 3;
-    evidence.push("财星偏旺，现实事务可能干扰专注");
-  }
-
-  const dmEl = bazi.dayMasterStrength.dayMasterElement;
-  if (dmEl === "木" || dmEl === "火") {
-    score += 3;
-    evidence.push("木火通明倾向，利理解与创新");
-  }
-
-  for (const pillar of flow.dayPillars) {
-    const tenGod = getTenGod(dm, pillar.stem);
-    if (tenGod === "正印" || tenGod === "偏印") score += 4;
-    const el = STEM_ELEMENT[pillar.stem];
-    if (elementSupports(el, dmEl)) score += 2;
-  }
-
-  if (focusArea === "study") score += 6;
-
-  return { score: clampScore(score), evidence };
-}
-
-function scoreSocial(bazi: BaziAlgorithmResult, flow: FlowContext, focusArea?: string): {
-  score: number;
-  evidence: string[];
-} {
-  let score = BASE_SCORE;
-  const evidence: string[] = [];
-  const dm = bazi.pillars.day.stem;
-  const tg = bazi.tenGods.counts;
-  const br = bazi.branchRelations;
-
-  if (br.combinations.length || br.meetings.length) {
-    score += 5;
-    evidence.push("命局合局较好，人际互动有协调基础");
-  }
-  if (br.clashes.length || br.harms.length) {
-    score -= 4;
-    evidence.push("命局冲害存在，社交中宜留余地");
-  }
-
-  const output = (tg["食神"] ?? 0) + (tg["伤官"] ?? 0);
-  if (output > 0.5 && output < 3) {
-    score += 5;
-    evidence.push("食伤适度，表达与倾听较平衡");
-  }
-  if ((tg["伤官"] ?? 0) > 2) {
-    score -= 5;
-    evidence.push("伤官偏强，言辞可能偏锋利");
-  }
-  if ((tg["比肩"] ?? 0) + (tg["劫财"] ?? 0) > 3) {
-    score -= 5;
-    evidence.push("比劫偏旺，合作中竞争感可能增强");
-  }
-
-  if (findStar(bazi, "桃花")) {
-    score += 4;
-    evidence.push("桃花助人缘，适合主动联络");
-  }
-
-  for (const pillar of flow.dayPillars) {
-    const virtual: FourPillars = {
-      year: bazi.pillars.year,
-      month: bazi.pillars.month,
-      day: bazi.pillars.day,
-      hour: pillar,
-    };
-    const rel = analyzeBranchRelations(virtual);
-    if (rel.analysis.combinations.length) score += 2;
-    if (rel.analysis.clashes.length) score -= 3;
-  }
-
-  if (focusArea === "health") {
-    evidence.push("健康关注下，综合分与人际保持正常权重，不作医疗预测");
-  }
-
-  return { score: clampScore(score), evidence };
-}
-
-const CATEGORY_SCORERS: Record<
-  SubCategory,
-  (b: BaziAlgorithmResult, f: FlowContext, focus?: string) => { score: number; evidence: string[] }
-> = {
-  love: scoreLove,
-  wealth: scoreWealth,
-  career: scoreCareer,
-  study: scoreStudy,
-  social: scoreSocial,
-};
-
-function scoreWeekCategory(
+function categorySignalFromTenGod(
+  god: string,
+  category: SubCategory,
+  dmStrength: string,
   bazi: BaziAlgorithmResult,
-  start: Date,
-  end: Date,
+): number {
+  let d = 0;
+  const hasSeal =
+    (bazi.tenGods.counts["正印"] ?? 0) + (bazi.tenGods.counts["偏印"] ?? 0) > 0;
+
+  if (god === "正财" || god === "偏财") {
+    if (category === "wealth") d += dmStrength === "weak" ? -4 : 5;
+  }
+  if (god === "正官" || god === "七杀") {
+    if (category === "career") {
+      d += hasSeal && dmStrength !== "weak" ? 5 : dmStrength === "weak" ? -4 : 3;
+    }
+  }
+  if (god === "正印" || god === "偏印") {
+    if (category === "study") d += 5;
+    if (category === "social") d += 1;
+  }
+  if (god === "食神" || god === "伤官") {
+    if (category === "social") d += 4;
+    if (category === "study") d += 3;
+    if (category === "love") d += 2;
+  }
+  if (god === "比肩" || god === "劫财") {
+    if (category === "social") d += 2;
+    if (category === "wealth") d -= 3;
+  }
+  return d;
+}
+
+function relationDelta(type: string, category: SubCategory, natal = ""): number {
+  if (type === "六合") {
+    if (category === "love") return 5;
+    if (category === "social") return 3;
+  }
+  if (type === "冲") {
+    if (category === "love") return -6;
+    if (category === "social") return -3;
+    if (natal.includes("月") && category === "career") return -5;
+    if (natal.includes("月") && category === "study") return -3;
+  }
+  if (type === "害" && category === "social") return -2;
+  if ((type === "三合" || type === "三会") && category === "social") return 2;
+  return 0;
+}
+
+function scoreDayCategory(
+  bazi: BaziAlgorithmResult,
+  transit: TransitContext,
   category: SubCategory,
   focusArea?: string,
 ): { score: number; evidence: string[] } {
-  const days = enumerateDays(start, end);
-  const dailyScores: number[] = [];
+  const weights = { luck: 0.2, year: 0.25, month: 0.25, day: 0.3 };
+  let score = BASE_SCORE;
+  score += scoreLayerFromTransit(bazi, transit, category, "luck") * weights.luck;
+  score += scoreLayerFromTransit(bazi, transit, category, "year") * weights.year;
+  score += scoreLayerFromTransit(bazi, transit, category, "month") * weights.month;
+  score += scoreLayerFromTransit(bazi, transit, category, "day") * weights.day;
+  score += transit.categorySignals[category] * 0.35;
+  score += transit.usefulGodAlignment * 0.15;
+  score -= transit.avoidGodPressure * 0.12;
+
+  if (focusArea === category) score += 4;
+  if (focusArea === "health" && category === "social") score += 0;
+
+  const evidence = [
+    ...transit.evidence.slice(0, 4),
+    `流日${transit.day.pillar}对${category}类信号 ${transit.categorySignals[category] >= 0 ? "+" : ""}${Math.round(transit.categorySignals[category])}`,
+  ];
+
+  return { score: clampScore(score), evidence };
+}
+
+function scoreWeekCategory(
+  bazi: BaziAlgorithmResult,
+  dates: Date[],
+  category: SubCategory,
+  focusArea?: string,
+): { score: number; evidence: string[] } {
+  let totalW = 0;
+  let weighted = 0;
+  const dailyScores: { date: Date; score: number }[] = [];
+  const tenGodCount: Record<string, number> = {};
   const evidence: string[] = [];
 
-  for (const day of days) {
-    const flow = buildFlowContext("day", day, day);
-    const result = CATEGORY_SCORERS[category](bazi, flow, focusArea);
-    dailyScores.push(result.score);
-    if (result.evidence.length) evidence.push(...result.evidence.slice(0, 1));
+  for (const d of dates) {
+    const transit = calculateTransitContext(bazi, d);
+    const { score } = scoreDayCategory(bazi, transit, category, focusArea);
+    const w = weekdayCategoryWeight(d.getDay(), category);
+    weighted += score * w;
+    totalW += w;
+    dailyScores.push({ date: d, score });
+    tenGodCount[transit.day.stemTenGod] = (tenGodCount[transit.day.stemTenGod] ?? 0) + 1;
   }
 
-  const avg = dailyScores.reduce((a, b) => a + b, 0) / dailyScores.length;
-  const bestIdx = dailyScores.indexOf(Math.max(...dailyScores));
-  const worstIdx = dailyScores.indexOf(Math.min(...dailyScores));
+  const avg = weighted / totalW;
+  dailyScores.sort((a, b) => b.score - a.score);
+  const best = dailyScores[0];
+  const worst = dailyScores[dailyScores.length - 1];
+
+  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   evidence.push(
-    `本周${formatDateLabel(days[bestIdx])}相对突出`,
-    `本周${formatDateLabel(days[worstIdx])}宜放慢节奏`,
+    `本周${weekdays[best.date.getDay()]}（${formatDate(best.date)}）${category}节奏相对突出`,
+    `本周${weekdays[worst.date.getDay()]}（${formatDate(worst.date)}）宜保守、放慢节奏`,
   );
 
-  return { score: clampScore(avg), evidence: [...new Set(evidence)].slice(0, 5) };
+  const dominant = Object.entries(tenGodCount).sort((a, b) => b[1] - a[1])[0];
+  if (dominant) {
+    evidence.push(`本周流日十神${dominant[0]}出现 ${dominant[1]} 次，主导本周${category}主题`);
+  }
+
+  const weekTransit = calculateTransitContext(bazi, dates[3] ?? dates[0]);
+  evidence.push(`本周中段流月${weekTransit.month.pillar}、流年${weekTransit.year.pillar}共同塑形`);
+
+  return { score: clampScore(avg), evidence };
 }
 
-function computeSubScores(
+function scoreMonthCategory(
   bazi: BaziAlgorithmResult,
-  flow: FlowContext,
+  range: ReturnType<typeof resolveLuckPeriodRange>,
+  category: SubCategory,
   focusArea?: string,
-): Record<SubCategory, { score: number; evidence: string[] }> {
-  const result = {} as Record<SubCategory, { score: number; evidence: string[] }>;
+): { score: number; evidence: string[] } {
+  const anchorTransit = calculateTransitContext(bazi, range.anchorDate);
+  const weights = { luck: 0.25, year: 0.3, month: 0.35, day: 0.1 };
 
-  if (flow.period === "week") {
-    for (const cat of Object.keys(CATEGORY_SCORERS) as SubCategory[]) {
-      result[cat] = scoreWeekCategory(
-        bazi,
-        flow.startDate,
-        flow.endDate,
-        cat,
-        focusArea,
-      );
+  let score = BASE_SCORE;
+  score += scoreLayerFromTransit(bazi, anchorTransit, category, "luck") * weights.luck;
+  score += scoreLayerFromTransit(bazi, anchorTransit, category, "year") * weights.year;
+  score += scoreLayerFromTransit(bazi, anchorTransit, category, "month") * weights.month;
+
+  let daySum = 0;
+  for (const d of range.dates) {
+    const t = calculateTransitContext(bazi, d);
+    daySum += scoreLayerFromTransit(bazi, t, category, "day");
+  }
+  score += (daySum / range.dates.length) * weights.day;
+  score += anchorTransit.categorySignals[category] * 0.4;
+
+  const y = range.startDate.getFullYear();
+  const m = range.startDate.getMonth() + 1;
+  const monthPillar = getMonthPillarForCalendarMonth(y, m);
+  const monthGod = getTenGod(bazi.pillars.day.stem, monthPillar.stem);
+
+  const evidence = [
+    `本月流月${pillarToString(monthPillar)}，${monthGod}主导全月节奏`,
+    `本月与流年${anchorTransit.year.pillar}、大运${anchorTransit.currentLuckCycle ? pillarToString(anchorTransit.currentLuckCycle.pillar) : "—"}共同作用`,
+    ...anchorTransit.relations.monthRelations.slice(0, 2).map((r) => r.description),
+    `月初至月末抽样 ${range.dates.length} 个节点校准流日波动`,
+  ];
+
+  if (focusArea === category) score += 4;
+
+  return { score: clampScore(score), evidence };
+}
+
+function scoreYearCategory(
+  bazi: BaziAlgorithmResult,
+  range: ReturnType<typeof resolveLuckPeriodRange>,
+  category: SubCategory,
+  focusArea?: string,
+): { score: number; evidence: string[] } {
+  const y = range.startDate.getFullYear();
+  const anchorTransit = calculateTransitContext(bazi, range.anchorDate);
+  const weights = { luck: 0.35, year: 0.4, month: 0.25 };
+
+  let score = BASE_SCORE;
+  score += scoreLayerFromTransit(bazi, anchorTransit, category, "luck") * weights.luck;
+  score += scoreLayerFromTransit(bazi, anchorTransit, category, "year") * weights.year;
+
+  let monthDelta = 0;
+  const monthScores: { month: number; pillar: string; delta: number }[] = [];
+  for (let mi = 1; mi <= 12; mi++) {
+    const mp = getMonthPillarForCalendarMonth(y, mi);
+    const god = getTenGod(bazi.pillars.day.stem, mp.stem);
+    const d = categorySignalFromTenGod(
+      god,
+      category,
+      bazi.dayMasterStrength.strengthLevel,
+      bazi,
+    );
+    monthDelta += d;
+    monthScores.push({ month: mi, pillar: pillarToString(mp), delta: d });
+  }
+  score += (monthDelta / 12) * weights.month;
+  score += anchorTransit.categorySignals[category] * 0.3;
+
+  monthScores.sort((a, b) => b.delta - a.delta);
+  const strong = monthScores.slice(0, 2);
+  const weak = monthScores.slice(-2);
+
+  const evidence = [
+    `${y}年流年${anchorTransit.year.pillar}，${anchorTransit.year.stemTenGod}为全年主轴`,
+    anchorTransit.currentLuckCycle
+      ? `与大运${pillarToString(anchorTransit.currentLuckCycle.pillar)}（${anchorTransit.currentLuckCycle.stemTenGod}）形成年度背景`
+      : "大运数据有限，以流年与原局为主",
+    `较顺月份：${strong.map((s) => `${s.month}月${s.pillar}`).join("、")}`,
+    `谨慎月份：${weak.map((s) => `${s.month}月${s.pillar}`).join("、")}`,
+    ...anchorTransit.relations.yearRelations.slice(0, 1).map((r) => r.description),
+  ];
+
+  if (focusArea === category) score += 4;
+
+  return { score: clampScore(score), evidence };
+}
+
+function computeCategoryForPeriod(
+  bazi: BaziAlgorithmResult,
+  range: ReturnType<typeof resolveLuckPeriodRange>,
+  category: SubCategory,
+  focusArea?: string,
+): { score: number; evidence: string[] } {
+  switch (range.period) {
+    case "day": {
+      const transit = calculateTransitContext(bazi, range.anchorDate);
+      return scoreDayCategory(bazi, transit, category, focusArea);
     }
-    return result;
+    case "week":
+      return scoreWeekCategory(bazi, range.dates, category, focusArea);
+    case "month":
+      return scoreMonthCategory(bazi, range, category, focusArea);
+    case "year":
+      return scoreYearCategory(bazi, range, category, focusArea);
   }
-
-  for (const cat of Object.keys(CATEGORY_SCORERS) as SubCategory[]) {
-    result[cat] = CATEGORY_SCORERS[cat](bazi, flow, focusArea);
-  }
-  return result;
 }
 
-function computeOverallScore(
-  subScores: Record<SubCategory, number>,
-  focusArea?: string,
-): number {
-  const weights = getCategoryWeights(focusArea);
-  let total = 0;
-  for (const cat of Object.keys(weights) as SubCategory[]) {
-    total += subScores[cat] * weights[cat];
-  }
-  return clampScore(total);
-}
-
-function buildDateLabel(
+function applyDeterministicAdjustment(
+  scores: Record<SubCategory, number>,
   period: LuckPeriod,
-  start: Date,
-  end: Date,
-  offset: number,
-): string {
-  const today = startOfDay(new Date());
-  if (period === "day") {
-    if (formatDate(start) === formatDate(today)) return "今天";
-    return formatDateLabel(start);
+  range: ReturnType<typeof resolveLuckPeriodRange>,
+  anchorTransit: TransitContext,
+): { scores: Record<SubCategory, number>; basisNote?: string } {
+  const pillarKey = `${anchorTransit.year.pillar}|${anchorTransit.month.pillar}|${anchorTransit.day.pillar}`;
+  const hash = deterministicTransitHash(
+    period,
+    formatDate(range.startDate),
+    formatDate(range.endDate),
+    pillarKey,
+  );
+  if (hash === 0) return { scores };
+
+  const adjusted = { ...scores };
+  for (const cat of SUB_CATEGORIES) {
+    adjusted[cat] = clampScore(adjusted[cat] + hash);
   }
-  if (period === "week") {
-    if (offset === 0) return "本周";
-    if (offset === -1) return "上周";
-    if (offset === 1) return "下周";
-    return `${formatDate(start).slice(5)}-${formatDate(end).slice(5)}`;
-  }
-  if (period === "month") {
-    if (offset === 0) return "本月";
-    if (offset === -1) return "上月";
-    if (offset === 1) return "下月";
-    return `${start.getFullYear()}年${start.getMonth() + 1}月`;
-  }
-  if (offset === 0) return "今年";
-  if (offset === -1) return "去年";
-  if (offset === 1) return "明年";
-  return `${start.getFullYear()}年`;
+  return {
+    scores: adjusted,
+    basisNote: `周期差异微调：基于流期干支哈希，修正 ${hash > 0 ? "+" : ""}${hash}`,
+  };
 }
 
 function buildCalculationBasis(
   bazi: BaziAlgorithmResult,
-  flow: FlowContext,
+  range: ReturnType<typeof resolveLuckPeriodRange>,
+  transit: TransitContext,
 ): string[] {
   const basis: string[] = [
-    "基于本命四柱、五行、十神、合冲刑害与神煞标签",
+    `周期：${range.period}（${range.label}）`,
+    "基于本命四柱、五行、十神、合冲刑害、神煞与流期干支",
+    `流年 ${transit.year.pillar}（${transit.year.stemTenGod}）`,
+    `流月 ${transit.month.pillar}（${transit.month.stemTenGod}）`,
   ];
 
-  if (flow.dayPillars.length === 1) {
-    basis.push(`流日干支 ${pillarToString(flow.dayPillars[0])}`);
-  } else if (flow.dayPillars.length > 1) {
-    basis.push(`综合 ${flow.dayPillars.length} 天流日平均`);
-  }
-
-  if (flow.monthPillar) {
-    basis.push(`流月干支 ${pillarToString(flow.monthPillar)}`);
-  }
-  if (flow.yearPillar) {
-    basis.push(`流年干支 ${pillarToString(flow.yearPillar)}`);
-  }
-
-  if (bazi.luckCycle?.cycles.length) {
-    basis.push("结合当前大运周期");
+  if (range.period === "day") {
+    basis.push(`流日 ${transit.day.pillar}（${transit.day.stemTenGod}）`);
+  } else if (range.period === "week") {
+    basis.push(`聚合本周 ${range.dates.length} 天流日加权平均`);
+  } else if (range.period === "month") {
+    basis.push(`以流月为主导，抽样 ${range.dates.length} 个流日节点`);
   } else {
-    basis.push("大运数据有限，使用基础评分模型");
+    basis.push("以流年为主导，结合12个月流月趋势");
   }
 
-  if (bazi.usefulGods) {
+  if (transit.currentLuckCycle) {
     basis.push(
-      `喜用倾向 ${bazi.usefulGods.usefulElementTendency.join("、")}`,
+      `当前大运 ${pillarToString(transit.currentLuckCycle.pillar)}（${transit.currentLuckCycle.stemTenGod}）`,
     );
   }
 
+  if (bazi.usefulGods) {
+    basis.push(`喜用 ${bazi.usefulGods.usefulElementTendency.join("、")}`);
+  }
+
   return basis;
+}
+
+function buildDebugHash(
+  period: LuckPeriod,
+  range: ReturnType<typeof resolveLuckPeriodRange>,
+  transit: TransitContext,
+  scores: Record<SubCategory, number>,
+): string {
+  const payload = [
+    period,
+    formatDate(range.startDate),
+    formatDate(range.endDate),
+    transit.year.pillar,
+    transit.month.pillar,
+    transit.day.pillar,
+    ...SUB_CATEGORIES.map((c) => scores[c]),
+  ].join("|");
+  let h = 0;
+  for (let i = 0; i < payload.length; i++) {
+    h = Math.imul(31, h) + payload.charCodeAt(i);
+    h |= 0;
+  }
+  return `lk${(h >>> 0).toString(16)}`;
 }
 
 export function generateLuckOverview(
@@ -660,57 +466,96 @@ export function generateLuckOverview(
   const targetDate = startOfDay(input.targetDate ?? new Date());
   const offset = input.timelineOffset ?? 0;
   const focusArea = input.focusArea ?? "overall";
-  const { start, end } = getPeriodRange(input.period, targetDate, offset);
-  const flow = buildFlowContext(input.period, start, end);
+  const range = resolveLuckPeriodRange(targetDate, input.period, offset);
+  const { baziResult } = input;
+  const anchorTransit = calculateTransitContext(baziResult, range.anchorDate);
 
-  if (flow.yearPillar && input.baziResult.pillars.day.stem) {
-    flow.yearStemTenGod = getTenGod(
-      input.baziResult.pillars.day.stem,
-      flow.yearPillar.stem,
-    );
+  const raw: Record<SubCategory, { score: number; evidence: string[] }> =
+    {} as Record<SubCategory, { score: number; evidence: string[] }>;
+
+  for (const cat of SUB_CATEGORIES) {
+    raw[cat] = computeCategoryForPeriod(baziResult, range, cat, focusArea);
   }
 
-  const raw = computeSubScores(input.baziResult, flow, focusArea);
-  const subScoreNums = Object.fromEntries(
-    Object.entries(raw).map(([k, v]) => [k, v.score]),
+  let subScoreNums = Object.fromEntries(
+    SUB_CATEGORIES.map((c) => [c, raw[c].score]),
   ) as Record<SubCategory, number>;
 
-  let overallScore = computeOverallScore(subScoreNums, focusArea);
-  const locationNotes: string[] = [];
+  const { scores: adjusted, basisNote } = applyDeterministicAdjustment(
+    subScoreNums,
+    input.period,
+    range,
+    anchorTransit,
+  );
+  subScoreNums = adjusted;
 
-  const locBias = input.baziResult.locationInfluence?.resolved.elementBias;
-  if (locBias && input.baziResult.locationInfluence?.resolved.locationConfidence !== "unknown") {
-    const useful = input.baziResult.usefulGods?.usefulElementTendency ?? [];
-    const avoid = input.baziResult.usefulGods?.avoidElementTendency ?? [];
+  const weights = getCategoryWeights(focusArea);
+  let overallScore = 0;
+  for (const cat of SUB_CATEGORIES) {
+    overallScore += subScoreNums[cat] * weights[cat];
+  }
+  overallScore = clampScore(overallScore);
+
+  const locationNotes: string[] = [];
+  const locBias = baziResult.locationInfluence?.resolved.elementBias;
+  if (
+    locBias &&
+    baziResult.locationInfluence?.resolved.locationConfidence !== "unknown"
+  ) {
+    const useful = baziResult.usefulGods?.usefulElementTendency ?? [];
+    const avoid = baziResult.usefulGods?.avoidElementTendency ?? [];
     const delta = computeLocationLuckDelta(locBias, useful, avoid);
     if (delta !== 0) {
       overallScore = clampScore(overallScore + delta);
       locationNotes.push(
-        `地域气候五行辅助调整 ${delta > 0 ? "+" : ""}${delta} 分（上限±3，不替代命局判断）`,
+        `地域气候五行辅助调整 ${delta > 0 ? "+" : ""}${delta} 分（上限±3）`,
       );
     }
   }
 
-  const scores: LuckScore[] = (Object.keys(raw) as SubCategory[]).map((cat) =>
-    buildLuckScore(cat, raw[cat].score, raw[cat].evidence, focusArea),
+  const scores: LuckScore[] = SUB_CATEGORIES.map((cat) =>
+    buildLuckScore({
+      category: cat,
+      score: subScoreNums[cat],
+      evidence: raw[cat].evidence,
+      focusArea,
+      period: input.period,
+      dateLabel: range.label,
+      startDate: formatDate(range.startDate),
+      endDate: formatDate(range.endDate),
+      transit: anchorTransit,
+    }),
   );
 
   const { highlights, cautions } = buildHighlightsAndCautions(scores);
+  const transitSummary = buildTransitSummary(anchorTransit, range);
+  const periodInsights = buildPeriodInsights(
+    input.period,
+    range,
+    scores,
+    anchorTransit,
+  );
+
+  const calculationBasis = [
+    ...buildCalculationBasis(baziResult, range, anchorTransit),
+    ...(basisNote ? [basisNote] : []),
+    ...locationNotes,
+  ];
 
   return {
     period: input.period,
-    dateLabel: buildDateLabel(input.period, start, end, offset),
-    startDate: formatDate(start),
-    endDate: formatDate(end),
+    dateLabel: range.label,
+    startDate: formatDate(range.startDate),
+    endDate: formatDate(range.endDate),
     overallScore,
     overallLevel: scoreToLevel(overallScore),
     scores,
     highlights,
     cautions,
-    calculationBasis: [
-      ...buildCalculationBasis(input.baziResult, flow),
-      ...locationNotes,
-    ],
+    calculationBasis,
+    transitSummary,
+    periodInsights,
+    debugHash: buildDebugHash(input.period, range, anchorTransit, subScoreNums),
   };
 }
 
@@ -728,4 +573,4 @@ export function generateAllLuckOverviews(
   };
 }
 
-export { getCategoryWeights, clampScore, getPeriodRange };
+export { getPeriodRange };

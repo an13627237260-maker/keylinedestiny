@@ -20,6 +20,23 @@ export interface LuckScore {
   evidence: string[];
 }
 
+export interface TransitSummary {
+  yearPillar: string;
+  monthPillar?: string;
+  dayPillar?: string;
+  luckCyclePillar?: string;
+  dominantElements: string[];
+  dominantTenGods: string[];
+  importantRelations: string[];
+}
+
+export interface PeriodInsights {
+  bestTimes: string[];
+  cautionTimes: string[];
+  mainTheme: string;
+  actionSuggestion: string;
+}
+
 export interface LuckOverview {
   period: LuckPeriod;
   dateLabel: string;
@@ -31,6 +48,9 @@ export interface LuckOverview {
   highlights: string[];
   cautions: string[];
   calculationBasis: string[];
+  transitSummary: TransitSummary;
+  periodInsights: PeriodInsights;
+  debugHash?: string;
 }
 
 export interface LuckOverviewSet {

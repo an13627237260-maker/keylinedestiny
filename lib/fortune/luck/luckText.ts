@@ -1,4 +1,13 @@
-import type { LuckCategory, LuckScore } from "./types";
+import { pillarToString } from "../bazi/ganzhi";
+import type { LuckPeriodRange } from "./periodResolver";
+import type { TransitContext } from "./transitCalculator";
+import type {
+  LuckCategory,
+  LuckPeriod,
+  LuckScore,
+  TransitSummary,
+  PeriodInsights,
+} from "./types";
 import { LUCK_CATEGORY_COLORS, LUCK_CATEGORY_LABELS } from "./types";
 
 export function scoreToLevel(score: number): string {
@@ -10,79 +19,16 @@ export function scoreToLevel(score: number): string {
   return "谨慎";
 }
 
-const FORBIDDEN_WORDS = ["一定", "必然", "注定", "包发财", "必脱单", "脱单", "复合", "正缘", "必定遇到", "会发财", "投资必赚", "彩票中奖"];
+const FORBIDDEN_WORDS = [
+  "一定", "必然", "注定", "包发财", "必脱单", "脱单", "复合", "正缘",
+  "必定遇到", "会发财", "投资必赚", "彩票中奖",
+];
 
 export function containsForbiddenText(text: string): boolean {
   return FORBIDDEN_WORDS.some((w) => text.includes(w));
 }
 
-interface TextInput {
-  category: Exclude<LuckCategory, "overall">;
-  score: number;
-  level: string;
-  keywords: string[];
-  evidence: string[];
-  focusArea?: string;
-}
-
-const SUMMARY_TEMPLATES: Record<
-  Exclude<LuckCategory, "overall">,
-  Record<string, string>
-> = {
-  love: {
-    high: "近期在感情方面的流动感较好，适合主动表达，也适合把之前没有说清楚的话慢慢讲开。单身的人更容易在人际互动中被注意到，但不建议急着推进关系；已有关系的人适合多给对方一些肯定和回应。",
-    mid: "感情状态整体平稳，适合慢慢沟通、倾听彼此需求。表达时尽量温和具体，避免带着情绪做判断，小误会也适合趁这段时间说清楚。",
-    low: "这段时间情绪可能更敏感，关系里容易出现小摩擦。适合先照顾好自己的节奏，再谈深层次的承诺或变化，沟通时留一点余地会更顺。",
-  },
-  wealth: {
-    high: "这段时间财务状态整体平稳偏顺，适合整理预算、检查支出和做长期规划。你会更容易意识到哪些钱值得花，哪些消费只是临时冲动。",
-    mid: "财务方面适合稳健规划，不宜做高风险决定。涉及较大金额时，建议多比较几次，不要只凭一时感觉决定。",
-    low: "这段时间花钱欲望可能偏强，适合先理清必要支出和可选消费。大额决定宜放缓，把账目和计划整理清楚再行动。",
-  },
-  career: {
-    high: "事业方面适合稳步推进，你更适合把手头任务整理清楚，先解决具体问题，再谈大的变化。与同事或上级沟通时，表达要直接但不要太硬。",
-    mid: "工作节奏宜稳不宜急，适合汇报进展、整理计划和补齐细节。遇到分歧时，先听清楚对方诉求，再提出自己的方案。",
-    low: "职场压力感可能偏重，不宜和规则硬碰硬。适合把任务拆解、分清优先级，沟通方式尽量务实，避免情绪化表态。",
-  },
-  study: {
-    high: "学习状态比前段时间更容易集中，适合整理笔记、复盘错题和建立知识框架。输出式学习会更有效，比如讲给别人听或自己写总结。",
-    mid: "学习方面适合系统复习，不要只追求速度，反而要把基础重新过一遍。每天固定一小段时间专注输入，效果会比突击更好。",
-    low: "注意力可能容易分散，不宜一次塞太多内容。适合缩短单次学习时长、增加休息，用清单把任务拆小会更容易坚持。",
-  },
-  social: {
-    high: "人际互动整体平稳，适合主动联系朋友或修复小误会。你会更容易被别人看见，但说话时要注意节奏，不要因为表达太直接让对方有压力。",
-    mid: "社交方面适合保持平常心，主动联系不必太刻意。倾听比说服更重要，遇到不同意见时留一点余地，关系会更轻松。",
-    low: "人际上可能出现一点紧绷感，不宜急着争输赢。适合放慢语速、减少评判，小误会用简单直接的方式澄清即可。",
-  },
-};
-
-const ADVICE_POOL: Record<Exclude<LuckCategory, "overall">, string[][]> = {
-  love: [
-    ["适合把话说清楚", "多给对方一点回应", "表达时先倾听再开口", "避免带着情绪做决定"],
-    ["适合安排轻松的相处时间", "用具体行动代替猜测", "关注彼此的节奏差异", "小矛盾宜早沟通"],
-    ["先照顾好自己的情绪", "不宜急着下结论", "给关系一点缓冲空间", "沟通时语气尽量柔和"],
-  ],
-  wealth: [
-    ["适合整理预算", "检查固定支出", "做长期财务规划", "记录一周花销"],
-    ["大额消费多比较几次", "区分必要与冲动消费", "稳健优先", "不宜跟风投资"],
-    ["暂缓高风险决定", "先理清账目", "控制非必要开支", "把计划写下来再执行"],
-  ],
-  career: [
-    ["适合推进手头任务", "整理工作优先级", "主动同步进展", "汇报时先给结论"],
-    ["适合补齐细节", "沟通保持务实", "不宜强行突破", "把计划拆成可执行步骤"],
-    ["避免和规则硬碰硬", "先减压再决策", "任务拆解后逐步完成", "注意沟通分寸"],
-  ],
-  study: [
-    ["适合系统复习", "整理笔记框架", "输出式学习", "复盘错题"],
-    ["固定每日学习时段", "基础再过一遍", "用清单追踪进度", "短时段专注更高效"],
-    ["缩短单次学习时长", "减少干扰源", "任务拆小", "休息后再继续"],
-  ],
-  social: [
-    ["适合主动联系", "倾听对方想法", "缓和小误会", "表达留余地"],
-    ["保持平常心", "不宜争输赢", "多用肯定语气", "聚会宜轻松"],
-    ["放慢沟通节奏", "减少评判", "简单澄清误会", "给自己独处时间"],
-  ],
-};
+type SubCategory = Exclude<LuckCategory, "overall">;
 
 function tier(score: number): "high" | "mid" | "low" {
   if (score >= 75) return "high";
@@ -90,43 +36,184 @@ function tier(score: number): "high" | "mid" | "low" {
   return "low";
 }
 
-function humanizeEvidence(evidence: string[]): string {
-  if (!evidence.length) return "";
-  const top = evidence.slice(0, 2).join("；");
-  return `从命理结构看，${top.replace(/十神/g, "角色能量").replace(/流年/g, "当年节奏").replace(/流日/g, "当日节奏").replace(/流月/g, "当月节奏")}。`;
+const CATEGORY_FOCUS: Record<SubCategory, string> = {
+  love: "感情互动与表达",
+  wealth: "财务规划与资源流动",
+  career: "工作推进与职场节奏",
+  study: "学习吸收与知识整理",
+  social: "人际联络与协作沟通",
+};
+
+function periodOpener(
+  period: LuckPeriod,
+  dateLabel: string,
+  startDate: string,
+  endDate: string,
+  transit: TransitContext,
+): string {
+  if (period === "day") {
+    return `今日（${startDate}）流日${transit.day.pillar}，${transit.day.stemTenGod}引动当日主题。`;
+  }
+  if (period === "week") {
+    return `本周（${startDate} 至 ${endDate}）以流月${transit.month.pillar}与七日流日聚合塑形，整体节奏${dateLabel === "本周" ? "围绕当前周" : `对应${dateLabel}`}展开。`;
+  }
+  if (period === "month") {
+    return `本月（${dateLabel}）流月${transit.month.pillar}为主导，${transit.month.stemTenGod}牵动全月${transit.month.stemElement}气。`;
+  }
+  return `${startDate.slice(0, 4)}年流年${transit.year.pillar}（${transit.year.stemTenGod}）为全年主轴，结合大运与十二流月趋势研判。`;
 }
 
-export function buildLuckScoreText(input: TextInput): Pick<
-  LuckScore,
-  "summary" | "advice" | "keywords"
-> {
+function evidenceSentences(evidence: string[], category: SubCategory): string {
+  const filtered = evidence.filter((e) => e.length > 4);
+  const pick = filtered.slice(0, 2);
+  if (pick.length < 2 && filtered.length > 0) {
+    pick.push(filtered[filtered.length - 1]);
+  }
+  if (pick.length === 0) {
+    return `从命局结构看，${CATEGORY_FOCUS[category]}需结合当下节奏循序渐进，不宜急于求成。`;
+  }
+  return pick.join("；") + "。";
+}
+
+function relationTone(evidence: string[]): string {
+  const hasClash = evidence.some((e) => e.includes("冲") || e.includes("放缓"));
+  const hasCombine = evidence.some((e) => e.includes("合") || e.includes("连接"));
+  if (hasClash) {
+    return "存在冲动关系时，宜节奏放缓、沟通留余地、不急着做决定。";
+  }
+  if (hasCombine) {
+    return "合局较明显时，适合连接、关系缓和与合作推进。";
+  }
+  return "";
+}
+
+function tierNarrative(category: SubCategory, t: "high" | "mid" | "low"): string {
+  const map: Record<SubCategory, Record<string, string>> = {
+    love: {
+      high: "情感流动感较好，适合把话说清楚，也给彼此一点回应空间。",
+      mid: "感情整体平稳，宜慢慢沟通、倾听需求，避免带着情绪下判断。",
+      low: "情绪可能更敏感，关系中宜先照顾自身节奏，再谈深层变化。",
+    },
+    wealth: {
+      high: "财务节奏偏顺，适合整理预算、检查支出并做中期规划。",
+      mid: "财务宜稳健，大额决定多比较几次，区分必要与冲动消费。",
+      low: "开支欲望可能偏强，先理清账目，暂缓高风险决定。",
+    },
+    career: {
+      high: "事业适合稳步推进，先解决手头具体问题，再谈大的调整。",
+      mid: "工作节奏宜稳不宜急，汇报进展、补齐细节会更有效。",
+      low: "职场压力感可能偏重，任务拆解后逐步完成，避免和规则硬碰硬。",
+    },
+    study: {
+      high: "学习状态较易集中，适合整理笔记、复盘错题、建立知识框架。",
+      mid: "学习宜系统复习，固定每日短时段专注，比突击更有效。",
+      low: "注意力可能易分散，缩短单次学习时长、用清单拆小任务。",
+    },
+    social: {
+      high: "人际互动较顺，适合主动联系，倾听比说服更重要。",
+      mid: "社交保持平常心即可，遇到分歧时留一点余地。",
+      low: "人际可能略紧绷，放慢语速、减少评判，小误会宜早澄清。",
+    },
+  };
+  return map[category][t];
+}
+
+function padToMinLength(text: string, minLen: number): string {
+  let s = text;
+  const pads = [
+    " 把趋势当作生活参考，用行动验证会比空想更有收获。",
+    " 保持平常心，遇到波动时先稳住节奏再调整策略。",
+    " 命理提示的是倾向，不是定论，关键仍在你如何回应。",
+  ];
+  let i = 0;
+  while (s.length < minLen && i < pads.length) {
+    s += pads[i++];
+  }
+  return s;
+}
+
+interface BuildLuckScoreInput {
+  category: SubCategory;
+  score: number;
+  evidence: string[];
+  focusArea?: string;
+  period: LuckPeriod;
+  dateLabel: string;
+  startDate: string;
+  endDate: string;
+  transit: TransitContext;
+}
+
+export function buildLuckScoreText(
+  input: BuildLuckScoreInput,
+): Pick<LuckScore, "summary" | "advice" | "keywords"> {
   const t = tier(input.score);
-  let summary = SUMMARY_TEMPLATES[input.category][t];
-  const ev = humanizeEvidence(input.evidence);
-  if (ev) summary = `${summary}${ev}`;
+  const opener = periodOpener(
+    input.period,
+    input.dateLabel,
+    input.startDate,
+    input.endDate,
+    input.transit,
+  );
+  const ev = evidenceSentences(input.evidence, input.category);
+  const rel = relationTone(input.evidence);
+  const narrative = tierNarrative(input.category, t);
 
-  while (summary.length < 150) {
-    summary += " 保持平常心，把趋势当作生活参考，用行动验证会比空想更有收获。";
-  }
-  if (summary.length > 250) {
-    summary = summary.slice(0, 248) + "…";
-  }
-
-  const adviceIdx = t === "high" ? 0 : t === "mid" ? 1 : 2;
-  let advice = [...ADVICE_POOL[input.category][adviceIdx]];
+  let summary = `${opener}${narrative}${ev}`;
+  if (rel) summary += rel;
   if (input.focusArea === input.category) {
-    advice.unshift(`你当前关注${LUCK_CATEGORY_LABELS[input.category]}，可优先落实以上建议`);
+    summary += `你当前关注${LUCK_CATEGORY_LABELS[input.category]}，可优先落实以下建议。`;
   }
-  advice = advice.slice(0, 4);
+  summary = padToMinLength(summary, 120);
+  if (summary.length > 320) summary = summary.slice(0, 318) + "…";
+
+  const advice: string[] = [];
+  if (input.evidence.some((e) => e.includes("冲"))) {
+    advice.push("节奏放缓，沟通留余地");
+  }
+  if (input.evidence.some((e) => e.includes("合") || e.includes("连接"))) {
+    advice.push("适合连接与合作推进");
+  }
+  if (input.transit.day.stemTenGod.includes("财") && input.category === "wealth") {
+    advice.push("整理账目与预算安排");
+  }
+  if (
+    (input.transit.day.stemTenGod === "正印" || input.transit.day.stemTenGod === "偏印") &&
+    input.category === "study"
+  ) {
+    advice.push("固定时段复盘与整理笔记");
+  }
+  if (
+    (input.transit.day.stemTenGod === "食神" || input.transit.day.stemTenGod === "伤官") &&
+    (input.category === "social" || input.category === "love")
+  ) {
+    advice.push("表达前先倾听，语气宜柔和");
+  }
+  if (
+    (input.transit.day.stemTenGod === "正官" || input.transit.day.stemTenGod === "七杀") &&
+    input.category === "career"
+  ) {
+    advice.push("推进任务宜分步执行");
+  }
+
+  const fallbackAdvice: Record<SubCategory, string[][]> = {
+    love: [["多给对方回应", "表达前先倾听", "避免情绪化决定"], ["安排轻松相处", "用具体行动代替猜测"], ["先照顾情绪", "不宜急着下结论"]],
+    wealth: [["整理预算", "检查固定支出"], ["大额消费多比较", "稳健优先"], ["暂缓高风险决定", "理清账目"]],
+    career: [["推进手头任务", "整理优先级"], ["补齐细节", "沟通务实"], ["任务拆解", "避免硬碰硬"]],
+    study: [["系统复习", "整理笔记"], ["固定学习时段", "基础再过一遍"], ["缩短单次时长", "任务拆小"]],
+    social: [["主动联系", "倾听对方"], ["保持平常心", "留余地"], ["放慢节奏", "简单澄清误会"]],
+  };
+  const fb = fallbackAdvice[input.category][t === "high" ? 0 : t === "mid" ? 1 : 2];
+  for (const a of fb) {
+    if (advice.length < 4 && !advice.includes(a)) advice.push(a);
+  }
 
   const keywords =
-    input.keywords.length > 0
-      ? input.keywords
-      : t === "high"
-        ? ["流动顺畅", "适合行动"]
-        : t === "mid"
-          ? ["稳中求进", "保持节奏"]
-          : ["放慢脚步", "调整状态"];
+    t === "high"
+      ? ["流动顺畅", "适合行动", input.transit.month.stemElement + "气助势"]
+      : t === "mid"
+        ? ["稳中求进", "保持节奏"]
+        : ["放慢脚步", "调整状态"];
 
   for (const text of [summary, ...advice]) {
     if (containsForbiddenText(text)) {
@@ -134,34 +221,112 @@ export function buildLuckScoreText(input: TextInput): Pick<
     }
   }
 
-  return { summary, advice, keywords };
+  return { summary, advice: advice.slice(0, 4), keywords };
 }
 
-export function buildLuckScore(
-  category: Exclude<LuckCategory, "overall">,
-  score: number,
-  evidence: string[],
-  focusArea?: string,
-): LuckScore {
-  const level = scoreToLevel(score);
-  const text = buildLuckScoreText({
-    category,
-    score,
-    level,
-    keywords: [],
-    evidence,
-    focusArea,
-  });
+export function buildLuckScore(input: BuildLuckScoreInput): LuckScore {
+  const level = scoreToLevel(input.score);
+  const text = buildLuckScoreText(input);
 
   return {
-    category,
-    label: LUCK_CATEGORY_LABELS[category],
-    score,
+    category: input.category,
+    label: LUCK_CATEGORY_LABELS[input.category],
+    score: input.score,
     level,
-    color: LUCK_CATEGORY_COLORS[category],
-    evidence,
+    color: LUCK_CATEGORY_COLORS[input.category],
+    evidence: input.evidence,
     ...text,
   };
+}
+
+export function buildTransitSummary(
+  transit: TransitContext,
+  range: LuckPeriodRange,
+): TransitSummary {
+  const elements = Object.entries(transit.elementImpact)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([el]) => el);
+
+  const gods = [
+    transit.year.stemTenGod,
+    transit.month.stemTenGod,
+    transit.day.stemTenGod,
+    transit.currentLuckCycle?.stemTenGod,
+  ].filter(Boolean) as string[];
+
+  const godCount: Record<string, number> = {};
+  for (const g of gods) godCount[g] = (godCount[g] ?? 0) + 1;
+  const dominantTenGods = Object.entries(godCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([g]) => g);
+
+  const importantRelations = [
+    ...transit.relations.dayRelations,
+    ...transit.relations.monthRelations,
+    ...transit.relations.yearRelations,
+  ]
+    .slice(0, 4)
+    .map((r) => r.description);
+
+  return {
+    yearPillar: transit.year.pillar,
+    monthPillar: range.period !== "year" ? transit.month.pillar : transit.month.pillar,
+    dayPillar: range.period === "day" || range.period === "week" ? transit.day.pillar : undefined,
+    luckCyclePillar: transit.currentLuckCycle
+      ? pillarToString(transit.currentLuckCycle.pillar)
+      : undefined,
+    dominantElements: elements,
+    dominantTenGods,
+    importantRelations,
+  };
+}
+
+export function buildPeriodInsights(
+  period: LuckPeriod,
+  range: LuckPeriodRange,
+  scores: LuckScore[],
+  transit: TransitContext,
+): PeriodInsights {
+  const sorted = [...scores].sort((a, b) => b.score - a.score);
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+
+  const bestTimes: string[] = [];
+  const cautionTimes: string[] = [];
+
+  if (period === "week") {
+    bestTimes.push(`本周${best.label}方向较突出（${best.score}分）`);
+    cautionTimes.push(`本周${worst.label}宜保守（${worst.score}分）`);
+  } else if (period === "month") {
+    bestTimes.push(`本月上旬宜布局，中旬流月${transit.month.pillar}主导`);
+    cautionTimes.push(`本月下旬留意${worst.label}波动`);
+  } else if (period === "year") {
+    bestTimes.push(`${range.startDate.getFullYear()}年${best.label}趋势相对平稳`);
+    cautionTimes.push(`${range.startDate.getFullYear()}年${worst.label}需留神`);
+  } else {
+    bestTimes.push(`今日${best.label}较顺（${best.score}分）`);
+    cautionTimes.push(`今日${worst.label}宜留意（${worst.score}分）`);
+  }
+
+  let mainTheme = "";
+  if (period === "day") {
+    mainTheme = `今日流日${transit.day.pillar}，${transit.day.stemTenGod}引动一日节奏`;
+  } else if (period === "week") {
+    mainTheme = `本周以流月${transit.month.pillar}为底色，七日流日共同塑形`;
+  } else if (period === "month") {
+    mainTheme = `本月流月${transit.month.pillar}（${transit.month.stemTenGod}）主导全月主题`;
+  } else {
+    mainTheme = `${range.startDate.getFullYear()}年流年${transit.year.pillar}定义全年主轴`;
+  }
+
+  const actionSuggestion =
+    best.score >= 70
+      ? `优先把握${best.label}方向，${best.advice[0] ?? "稳步推进"}`
+      : `整体宜稳中求进，${worst.advice[0] ?? "放慢节奏"}`;
+
+  return { bestTimes, cautionTimes, mainTheme, actionSuggestion };
 }
 
 export function buildHighlightsAndCautions(
