@@ -46,8 +46,16 @@ export function LocationInfluenceCard({ algo }: { algo: BaziAlgorithmResult }) {
                 ? "省会近似"
                 : resolved.locationConfidence === "manual"
                   ? "手动坐标"
-                  : "未确定"}
+                  : resolved.locationConfidence === "online_verified"
+                    ? "联网校准"
+                    : "未确定"}
           </PillBadge>
+          {resolved.dataSource && (
+            <p className="mt-1 text-xs text-[var(--text-dim)]">
+              来源：{resolved.dataSource.providerName}
+              {resolved.dataSource.fromCache ? "（缓存）" : ""}
+            </p>
+          )}
         </div>
       </div>
 

@@ -68,7 +68,27 @@ describe("CHINA_PROVINCES 完整数据", () => {
     expect(wlmq.longitude).toBeCloseTo(87.6168, 2);
   });
 
-  it("省会 fallback 可用", () => {
+  it("重庆、石家庄、上海重点坐标准确", () => {
+    const cq = getCityEntry("重庆市", "重庆市")!;
+    const sjz = getCityEntry("河北省", "石家庄市")!;
+    const sh = getCityEntry("上海市", "上海市")!;
+    expect(cq.longitude).toBeCloseTo(106.5516, 2);
+    expect(sjz.longitude).toBeCloseTo(114.5149, 2);
+    expect(sh.longitude).toBeCloseTo(121.4737, 2);
+  });
+
+  it("所有城市坐标在中国合理范围内", () => {
+    for (const p of CHINA_PROVINCES) {
+      for (const c of p.cities) {
+        expect(c.longitude, `${p.name}${c.city} longitude`).toBeGreaterThanOrEqual(73);
+        expect(c.longitude, `${p.name}${c.city} longitude`).toBeLessThanOrEqual(135);
+        expect(c.latitude, `${p.name}${c.city} latitude`).toBeGreaterThanOrEqual(18);
+        expect(c.latitude, `${p.name}${c.city} latitude`).toBeLessThanOrEqual(54);
+      }
+    }
+  });
+
+  it("省会回退可用", () => {
     const cap = getProvinceCapital("四川省");
     expect(cap?.city).toBe("成都市");
   });

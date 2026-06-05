@@ -10,6 +10,7 @@ import { BaziResultPanels } from "@/components/bazi/bazi-result-panels";
 import { EmptyBaziState } from "@/components/bazi/EmptyBaziState";
 import { buildFortuneSuccess } from "@/lib/client/fortuneResponse";
 import { computeBazi } from "@/lib/fortune/bazi";
+import { calibrateBaziDataSources } from "@/lib/fortune/bazi/calibratedDataSource";
 import { runBaziRules } from "@/lib/fortune/rules/baziRules";
 import { generateBaziReport } from "@/lib/fortune/report/baziReport";
 import { toErrorResponse } from "@/lib/fortune/shared/errors";
@@ -61,11 +62,16 @@ function toSavedInput(
     birthPlace: input.birthPlace ?? input.birthPlaceNote,
     latitude: input.manualLatitude ?? input.latitude ?? loc?.latitude,
     longitude: input.manualLongitude ?? input.longitude ?? loc?.longitude,
-    timezone: input.timezone,
+    timezone: loc?.timezone ?? input.timezone,
     useTrueSolarTime: input.useTrueSolarTime,
     focusArea: input.focusArea,
     targetYear: input.targetYear,
     dayBoundaryMode: input.options?.dayBoundaryMode ?? "midnight",
+    useOnlineSolarTerms: input.options?.useOnlineSolarTermCalibration ?? false,
+    useOnlineLocationCalibration:
+      input.options?.useOnlineLocationCalibration ?? false,
+    overseasCountry: input.options?.overseasCountry,
+    overseasLocationQuery: input.options?.overseasLocationQuery,
     savedAt: new Date().toISOString(),
     version: 1,
   };
@@ -204,14 +210,28 @@ export default function BaziPage() {
       useTrueSolarTime: fd.get("useTrueSolarTime") === "on",
       focusArea: (fd.get("focusArea") as string) || "overall",
       targetYear: fd.get("targetYear") ? Number(fd.get("targetYear")) : undefined,
-      options: { dayBoundaryMode: (fd.get("dayBoundaryMode") as string) || "midnight" },
+      options: {
+        dayBoundaryMode: (fd.get("dayBoundaryMode") as string) || "midnight",
+        useOnlineSolarTermCalibration:
+          fd.get("useOnlineSolarTermCalibration") === "on",
+        useOnlineLocationCalibration:
+          fd.get("useOnlineLocationCalibration") === "on",
+        overseasCountry:
+          ((fd.get("overseasCountry") as string) || "").trim() || undefined,
+        overseasLocationQuery:
+          ((fd.get("overseasLocationQuery") as string) || "").trim() || undefined,
+      },
     };
 
     try {
       const input = baziInputSchema.parse(body);
       validateTimezone(input.timezone);
 
-      const { algorithm_result, calculation_steps, warnings } = computeBazi(input);
+      const calibration = await calibrateBaziDataSources(input);
+      const { algorithm_result, calculation_steps, warnings } = computeBazi(
+        input,
+        calibration,
+      );
       const rule_results = runBaziRules(algorithm_result, input.focusArea);
       const report = generateBaziReport(algorithm_result, rule_results, input);
       const luckOverview = generateAllLuckOverviews(

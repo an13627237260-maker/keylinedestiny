@@ -1,6 +1,8 @@
 import { DateTime } from "luxon";
 import type { CalculationStep } from "../shared/types";
 import { CHINA_STANDARD_LONGITUDE } from "../location/regionElements";
+import type { DataSourceMeta } from "../dataSources/types";
+import { getDataSourceLabel } from "../dataSources/providerStatus";
 
 export interface TrueSolarTimeResult {
   originalDateTime: DateTime;
@@ -10,13 +12,22 @@ export interface TrueSolarTimeResult {
   standardLongitude: number;
   correctionMinutes: number;
   useEquationOfTime: boolean;
+  utcOffsetMinutes?: number;
+  longitudeSource?: DataSourceMeta;
+  timezoneSource?: DataSourceMeta;
 }
 
-function resolveStandardLongitude(timezone: string): number {
+function resolveStandardLongitude(
+  timezone: string,
+  localDateTime: DateTime,
+  utcOffsetMinutes?: number,
+): number {
   if (timezone === "Asia/Shanghai") {
     return CHINA_STANDARD_LONGITUDE;
   }
-  return CHINA_STANDARD_LONGITUDE;
+  const offsetMinutes = utcOffsetMinutes ?? localDateTime.setZone(timezone).offset;
+  if (!Number.isFinite(offsetMinutes)) return CHINA_STANDARD_LONGITUDE;
+  return (offsetMinutes / 60) * 15;
 }
 
 export function calculateTrueSolarTime(
@@ -24,8 +35,17 @@ export function calculateTrueSolarTime(
   timezone: string,
   longitude: number,
   useEquationOfTime = false,
+  calibration?: {
+    utcOffsetMinutes?: number;
+    longitudeSource?: DataSourceMeta;
+    timezoneSource?: DataSourceMeta;
+  },
 ): TrueSolarTimeResult {
-  const standardLongitude = resolveStandardLongitude(timezone);
+  const standardLongitude = resolveStandardLongitude(
+    timezone,
+    localDateTime,
+    calibration?.utcOffsetMinutes,
+  );
   const correctionMinutes = (longitude - standardLongitude) * 4;
 
   let adjusted = localDateTime.plus({ minutes: correctionMinutes });
@@ -42,6 +62,9 @@ export function calculateTrueSolarTime(
     standardLongitude,
     correctionMinutes,
     useEquationOfTime,
+    utcOffsetMinutes: calibration?.utcOffsetMinutes,
+    longitudeSource: calibration?.longitudeSource,
+    timezoneSource: calibration?.timezoneSource,
   };
 }
 
@@ -56,10 +79,15 @@ export function buildTrueSolarTimeStep(
       original: result.originalDateTime.toISO(),
       timezone: result.timezone,
       longitude: result.longitude,
-      cityLabel: "出生地经度",
+      longitudeSource: result.longitudeSource
+        ? getDataSourceLabel(result.longitudeSource)
+        : "出生地经度",
+      timezoneSource: result.timezoneSource
+        ? getDataSourceLabel(result.timezoneSource)
+        : "输入时区",
     },
     method:
-      "中国标准时间参考经度 120°E；修正分钟 = (出生地经度 - 120) × 4；偏西则真太阳时更早",
+      "中国使用标准经度 120°E；海外使用时区 UTC offset × 15 得到标准经度；修正分钟 = (出生地经度 - 标准经度) × 4",
     result: {
       standardLongitude: result.standardLongitude,
       correctionMinutes: Number(result.correctionMinutes.toFixed(2)),
@@ -67,8 +95,17 @@ export function buildTrueSolarTimeStep(
       useEquationOfTime: result.useEquationOfTime,
       hourPillarChanged: impact?.hourPillarChanged ?? false,
       dayPillarChanged: impact?.dayPillarChanged ?? false,
+      crossedHourBranch: impact?.hourPillarChanged ?? false,
+      crossedDate: !result.originalDateTime.hasSame(result.adjustedDateTime, "day"),
+      utcOffsetMinutes: result.utcOffsetMinutes ?? null,
     },
     notes: [
+      result.longitudeSource
+        ? `经度来源：${getDataSourceLabel(result.longitudeSource)}。`
+        : "经度来源：出生地解析结果。",
+      result.timezoneSource
+        ? `时区来源：${getDataSourceLabel(result.timezoneSource)}。`
+        : "时区来源：用户输入或本地默认。",
       result.correctionMinutes < 0
         ? `真太阳时比北京时间约早 ${Math.abs(Math.round(result.correctionMinutes))} 分钟`
         : result.correctionMinutes > 0

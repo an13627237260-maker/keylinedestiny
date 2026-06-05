@@ -19,6 +19,7 @@ import { YearlyLuckCard } from "./YearlyLuckCard";
 import { PatternsCard } from "./PatternsCard";
 import { BaziReportCard } from "./BaziReportCard";
 import { CalculationStepsCard } from "./CalculationStepsCard";
+import { DataSourceCard } from "./DataSourceCard";
 
 export function BaziResultPanels({
   algo,
@@ -43,6 +44,9 @@ export function BaziResultPanels({
       </motion.div>
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <BaziOverviewCard algo={algo} />
+      </motion.div>
+      <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
+        <DataSourceCard steps={calculationSteps} />
       </motion.div>
       <motion.div variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
         <LocationInfluenceCard algo={algo} />

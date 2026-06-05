@@ -6,6 +6,10 @@ export const baziOptionsSchema = z.object({
   solarTermSource: z.enum(["builtIn", "external"]).default("builtIn"),
   useEquationOfTime: z.boolean().default(false),
   calendarRange: z.string().default("1900-2100"),
+  useOnlineSolarTermCalibration: z.boolean().default(false),
+  useOnlineLocationCalibration: z.boolean().default(false),
+  overseasLocationQuery: z.string().max(120).optional(),
+  overseasCountry: z.string().max(80).optional(),
 });
 
 export const baziInputSchema = z

@@ -56,6 +56,7 @@ export type LocationConfidence =
   | "exact_city"
   | "province_capital"
   | "manual"
+  | "online_verified"
   | "unknown";
 
 export interface ResolvedBirthLocation {
@@ -69,6 +70,7 @@ export interface ResolvedBirthLocation {
   climateTags: string[];
   elementBias?: ElementBias;
   locationConfidence: LocationConfidence;
+  dataSource?: DataSourceMeta;
   notes: string[];
   birthPlaceNote?: string;
 }
@@ -90,3 +92,4 @@ export interface LocationInfluence {
   };
   regionElementNote: string;
 }
+import type { DataSourceMeta } from "../dataSources/types";

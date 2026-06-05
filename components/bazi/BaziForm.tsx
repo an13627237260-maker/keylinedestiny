@@ -20,6 +20,7 @@ import {
   saveLastBaziInput,
   type SavedBaziFormInput,
 } from "@/lib/storage/baziFormStorage";
+import { clearCalibrationCache } from "@/lib/fortune/dataSources/cache";
 import { cn } from "@/lib/utils";
 
 function MysticInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -64,6 +65,10 @@ type FormState = {
   dayBoundaryMode: SavedBaziFormInput["dayBoundaryMode"];
   manualLon: string;
   manualLat: string;
+  useOnlineSolarTerms: boolean;
+  useOnlineLocationCalibration: boolean;
+  overseasCountry: string;
+  overseasCity: string;
 };
 
 const DEFAULT_FORM_STATE: FormState = {
@@ -81,6 +86,10 @@ const DEFAULT_FORM_STATE: FormState = {
   dayBoundaryMode: "midnight",
   manualLon: "",
   manualLat: "",
+  useOnlineSolarTerms: false,
+  useOnlineLocationCalibration: false,
+  overseasCountry: "",
+  overseasCity: "",
 };
 
 function numberString(n: number | undefined): string {
@@ -119,10 +128,11 @@ function stateFromSaved(input: SavedBaziFormInput): FormState {
       ? Math.abs(savedLat - cityLat)
       : 0;
   const hasManualCoords =
-    province !== UNKNOWN_PROVINCE &&
-    (cityEntry === undefined ||
-      (savedLon !== undefined && lonDiff > 0.0001) ||
-      (savedLat !== undefined && latDiff > 0.0001));
+    savedLon !== undefined &&
+    (province === UNKNOWN_PROVINCE ||
+      cityEntry === undefined ||
+      lonDiff > 0.0001 ||
+      latDiff > 0.0001);
 
   return {
     name: input.name ?? "",
@@ -133,12 +143,16 @@ function stateFromSaved(input: SavedBaziFormInput): FormState {
     city,
     birthPlace: input.birthPlace ?? "",
     timezone: input.timezone,
-    useTrueSolarTime: province === UNKNOWN_PROVINCE ? false : input.useTrueSolarTime,
+    useTrueSolarTime: input.useTrueSolarTime,
     focusArea: input.focusArea,
     targetYear: input.targetYear ? String(input.targetYear) : "",
     dayBoundaryMode: input.dayBoundaryMode,
     manualLon: hasManualCoords ? numberString(savedLon) : "",
     manualLat: hasManualCoords ? numberString(savedLat) : "",
+    useOnlineSolarTerms: input.useOnlineSolarTerms ?? false,
+    useOnlineLocationCalibration: input.useOnlineLocationCalibration ?? false,
+    overseasCountry: input.overseasCountry ?? "",
+    overseasCity: input.overseasLocationQuery ?? "",
   };
 }
 
@@ -169,10 +183,14 @@ function savedInputFromState(
     latitude,
     longitude,
     timezone: state.timezone || "Asia/Shanghai",
-    useTrueSolarTime: isUnknown ? false : state.useTrueSolarTime,
+    useTrueSolarTime: state.useTrueSolarTime,
     focusArea: state.focusArea,
     targetYear: state.targetYear ? Number(state.targetYear) : undefined,
     dayBoundaryMode: state.dayBoundaryMode,
+    useOnlineSolarTerms: state.useOnlineSolarTerms,
+    useOnlineLocationCalibration: state.useOnlineLocationCalibration,
+    overseasCountry: state.overseasCountry || undefined,
+    overseasLocationQuery: state.overseasCity || undefined,
     savedAt: new Date().toISOString(),
     version: 1,
   });
@@ -195,9 +213,13 @@ export function BaziForm({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [restored, setRestored] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [cacheNotice, setCacheNotice] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   const isUnknown = state.province === UNKNOWN_PROVINCE;
+  const hasManualCoordinates = Boolean(state.manualLon && state.manualLat);
+  const hasOverseasQuery = Boolean(state.overseasCity.trim());
+  const canUseTrueSolarTime = !isUnknown || hasManualCoordinates || hasOverseasQuery;
 
   const cities = useMemo(() => {
     if (isUnknown) return [];
@@ -253,7 +275,7 @@ export function BaziForm({
         city: UNKNOWN_CITY,
         manualLon: "",
         manualLat: "",
-        useTrueSolarTime: false,
+        useTrueSolarTime: prev.useTrueSolarTime,
       }));
       return;
     }
@@ -276,6 +298,12 @@ export function BaziForm({
     setAdvancedOpen(false);
     onInputChange?.(null);
     onClear?.();
+  }
+
+  function handleClearCalibrationCache() {
+    clearCalibrationCache();
+    setCacheNotice("校准缓存已清除");
+    window.setTimeout(() => setCacheNotice(""), 2500);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -320,6 +348,18 @@ export function BaziForm({
         <input type="hidden" name="locationUnknown" value={isUnknown ? "on" : ""} />
         {state.manualLon && <input type="hidden" name="manualLongitude" value={state.manualLon} />}
         {state.manualLat && <input type="hidden" name="manualLatitude" value={state.manualLat} />}
+        <input
+          type="hidden"
+          name="useOnlineSolarTermCalibration"
+          value={state.useOnlineSolarTerms ? "on" : ""}
+        />
+        <input
+          type="hidden"
+          name="useOnlineLocationCalibration"
+          value={state.useOnlineLocationCalibration ? "on" : ""}
+        />
+        <input type="hidden" name="overseasCountry" value={state.overseasCountry} />
+        <input type="hidden" name="overseasLocationQuery" value={state.overseasCity} />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormFieldShell label="姓名（可选）" htmlFor="name">
@@ -452,7 +492,7 @@ export function BaziForm({
 
         {isUnknown && (
           <p className="rounded-lg border border-[var(--border-soft)] px-3 py-2 text-xs text-[var(--warning)]">
-            未选择出生地，将不使用真太阳时修正。
+            未选择中国出生地。可在高级设置输入海外城市并联网校准，或手动填写经纬度继续排盘。
           </p>
         )}
 
@@ -470,8 +510,8 @@ export function BaziForm({
           <input
             type="checkbox"
             name="useTrueSolarTime"
-            checked={!isUnknown && state.useTrueSolarTime}
-            disabled={isUnknown}
+            checked={canUseTrueSolarTime && state.useTrueSolarTime}
+            disabled={!canUseTrueSolarTime}
             onChange={(e) => update("useTrueSolarTime", e.target.checked)}
             className="h-4 w-4 rounded border-[var(--border-purple)] accent-[var(--purple-primary)]"
           />
@@ -490,6 +530,64 @@ export function BaziForm({
 
         {advancedOpen && (
           <div className="grid grid-cols-1 gap-4 rounded-xl border border-[var(--border-soft)] p-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <p className="text-sm font-medium text-[var(--text-main)]">校准设置</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-dim)]">
+                联网校准仅用于查询节气、经纬度或时区等客观数据，不会上传完整命盘报告。你也可以关闭联网校准，系统会使用本地内置数据。
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-soft)] bg-[rgba(139,92,246,0.04)] px-4 py-3">
+              <input
+                type="checkbox"
+                checked={state.useOnlineSolarTerms}
+                onChange={(e) => update("useOnlineSolarTerms", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-[var(--border-purple)] accent-[var(--purple-primary)]"
+              />
+              <span>
+                <span className="block text-sm text-[var(--text-muted)]">
+                  使用联网校准节气
+                </span>
+                <span className="mt-1 block text-xs text-[var(--text-dim)]">
+                  默认关闭；联网失败会自动使用本地近似算法。
+                </span>
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border-soft)] bg-[rgba(139,92,246,0.04)] px-4 py-3">
+              <input
+                type="checkbox"
+                checked={state.useOnlineLocationCalibration}
+                onChange={(e) => update("useOnlineLocationCalibration", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-[var(--border-purple)] accent-[var(--purple-primary)]"
+              />
+              <span>
+                <span className="block text-sm text-[var(--text-muted)]">
+                  使用联网校准出生地坐标
+                </span>
+                <span className="mt-1 block text-xs text-[var(--text-dim)]">
+                  中国城市通常不需要；海外地点会按输入城市尝试查询。
+                </span>
+              </span>
+            </label>
+
+            <FormFieldShell label="海外国家 / 地区" htmlFor="overseasCountry" description="仅海外出生地需要">
+              <MysticInput
+                id="overseasCountry"
+                value={state.overseasCountry}
+                onChange={(e) => update("overseasCountry", e.target.value)}
+                placeholder="如 United States / Japan"
+              />
+            </FormFieldShell>
+            <FormFieldShell label="海外城市 / 地点" htmlFor="overseasCity" description="只发送地点文本，不发送姓名或完整出生时间">
+              <MysticInput
+                id="overseasCity"
+                value={state.overseasCity}
+                onChange={(e) => update("overseasCity", e.target.value)}
+                placeholder="如 New York / Tokyo"
+              />
+            </FormFieldShell>
+
             <FormFieldShell label="手动经度" htmlFor="manualLon" description="覆盖城市默认值">
               <MysticInput
                 id="manualLon"
@@ -498,7 +596,6 @@ export function BaziForm({
                 value={state.manualLon}
                 onChange={(e) => update("manualLon", e.target.value)}
                 placeholder={cityEntry?.longitude.toFixed(4)}
-                disabled={isUnknown}
               />
             </FormFieldShell>
             <FormFieldShell label="手动纬度" htmlFor="manualLat">
@@ -509,7 +606,6 @@ export function BaziForm({
                 value={state.manualLat}
                 onChange={(e) => update("manualLat", e.target.value)}
                 placeholder={cityEntry?.latitude.toFixed(4)}
-                disabled={isUnknown}
               />
             </FormFieldShell>
             <FormFieldShell label="时区" htmlFor="timezone">
@@ -533,6 +629,18 @@ export function BaziForm({
                 <option value="ziHour">子时初换日 (23:00)</option>
               </MysticSelect>
             </FormFieldShell>
+            <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+              <button
+                type="button"
+                onClick={handleClearCalibrationCache}
+                className="min-h-[36px] rounded-md border border-[var(--border-soft)] px-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)]"
+              >
+                清除校准缓存
+              </button>
+              {cacheNotice && (
+                <span className="text-xs text-[var(--gold-main)]">{cacheNotice}</span>
+              )}
+            </div>
           </div>
         )}
 

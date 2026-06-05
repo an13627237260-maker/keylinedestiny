@@ -9,6 +9,7 @@ import {
   resolveBirthLocation,
 } from "../location/locationResolver";
 import type { LocationInfluence } from "../location/types";
+import type { BaziCalibrationContext } from "./calibratedDataSource";
 import { analyzeBranchRelations } from "./branchRelations";
 import { analyzeDayMasterStrength } from "./dayMasterStrength";
 import { analyzeFiveElements } from "./fiveElements";
@@ -61,11 +62,27 @@ export function computeBazi(input: BaziInput): {
   algorithm_result: BaziAlgorithmResult;
   calculation_steps: CalculationStep[];
   warnings: string[];
+};
+export function computeBazi(
+  input: BaziInput,
+  calibration: BaziCalibrationContext,
+): {
+  algorithm_result: BaziAlgorithmResult;
+  calculation_steps: CalculationStep[];
+  warnings: string[];
+};
+export function computeBazi(
+  input: BaziInput,
+  calibration?: BaziCalibrationContext,
+): {
+  algorithm_result: BaziAlgorithmResult;
+  calculation_steps: CalculationStep[];
+  warnings: string[];
 } {
   validateTimezone(input.timezone);
   const options = baziOptionsSchema.parse(input.options ?? {});
 
-  const resolved = resolveBirthLocation({
+  let resolved = resolveBirthLocation({
     province: input.province,
     city: input.city,
     birthPlace: input.birthPlace,
@@ -75,13 +92,23 @@ export function computeBazi(input: BaziInput): {
     latitude: input.latitude,
     manualLongitude: input.manualLongitude,
     manualLatitude: input.manualLatitude,
-  });
+    timezone: input.timezone,
+  }, calibration?.location);
 
-  const timezone = resolved.timezone || input.timezone;
+  const timezone = calibration?.timezone?.data.timezone || resolved.timezone || input.timezone;
   validateTimezone(timezone);
+  resolved = { ...resolved, timezone };
 
-  const steps: CalculationStep[] = [buildLocationResolvedStep(resolved)];
-  const warnings: string[] = [SOLAR_TERM_ACCURACY_NOTE];
+  const steps: CalculationStep[] = [
+    ...(calibration?.calculationSteps ?? []),
+    buildLocationResolvedStep(resolved),
+  ];
+  const warnings: string[] = [
+    ...(calibration?.warnings ?? []),
+    ...(calibration?.solarTerms?.meta.sourceType === "online_verified"
+      ? []
+      : [SOLAR_TERM_ACCURACY_NOTE]),
+  ];
 
   let dateTime = parseBirthDateTime(input.birthDate, input.birthTime, timezone);
   const originalDateTimeIso = dateTime.toISO() ?? "";
@@ -104,7 +131,12 @@ export function computeBazi(input: BaziInput): {
   let standardLongitude: number | undefined;
 
   if (useTrueSolarTime && resolved.longitude !== undefined) {
-    const reference = computeFourPillars(dateTime, timezone, options);
+    const reference = computeFourPillars(
+      dateTime,
+      timezone,
+      options,
+      calibration?.solarTermContext,
+    );
     pillarsBeforeCorrection = {
       year: pillarToString(reference.pillars.year),
       month: pillarToString(reference.pillars.month),
@@ -117,12 +149,22 @@ export function computeBazi(input: BaziInput): {
       timezone,
       resolved.longitude,
       options.useEquationOfTime,
+      {
+        utcOffsetMinutes: calibration?.timezone?.data.utcOffsetMinutes,
+        longitudeSource: resolved.dataSource,
+        timezoneSource: calibration?.timezone?.meta,
+      },
     );
     correctionMinutes = tst.correctionMinutes;
     standardLongitude = tst.standardLongitude;
     dateTime = tst.adjustedDateTime;
 
-    const adjusted = computeFourPillars(dateTime, timezone, options);
+    const adjusted = computeFourPillars(
+      dateTime,
+      timezone,
+      options,
+      calibration?.solarTermContext,
+    );
     hourPillarChanged =
       pillarToString(reference.pillars.hour) !==
       pillarToString(adjusted.pillars.hour);
@@ -137,13 +179,28 @@ export function computeBazi(input: BaziInput): {
     warnings.push("出生地未确定，未使用真太阳时修正。");
   }
 
-  steps.push(buildSolarTermStep(dateTime.year, timezone, dateTime));
-  warnings.push(...checkSolarTermProximityWarnings(dateTime, timezone));
+  steps.push(
+    buildSolarTermStep(
+      dateTime.year,
+      timezone,
+      dateTime,
+      calibration?.solarTermContext,
+      calibration?.solarTerms,
+    ),
+  );
+  warnings.push(
+    ...checkSolarTermProximityWarnings(
+      dateTime,
+      timezone,
+      calibration?.solarTermContext,
+    ),
+  );
 
   const { pillars, steps: pillarSteps } = computeFourPillars(
     dateTime,
     timezone,
     options,
+    calibration?.solarTermContext,
   );
   steps.push(...pillarSteps);
 

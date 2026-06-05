@@ -3,10 +3,19 @@ import type { EarthlyBranch } from "./constants";
 import type { FourPillars } from "./pillars";
 
 export interface BranchRelation {
-  type: "六合" | "三合" | "三会" | "六冲" | "六害" | "刑";
+  type:
+    | "六合"
+    | "三合"
+    | "三会"
+    | "六冲"
+    | "六害"
+    | "刑"
+    | "刑势倾向"
+    | "自刑";
   branches: EarthlyBranch[];
   pillars: string[];
   description: string;
+  confidence: number;
 }
 
 export interface BranchRelationsAnalysis {
@@ -59,12 +68,7 @@ const LIU_HAI: Array<[EarthlyBranch, EarthlyBranch]> = [
   ["酉", "戌"],
 ];
 
-const XING_RULES: Array<{ branches: EarthlyBranch[]; description: string }> = [
-  { branches: ["子", "卯"], description: "子卯刑" },
-  { branches: ["寅", "巳", "申"], description: "寅巳申三刑" },
-  { branches: ["丑", "未", "戌"], description: "丑未戌三刑" },
-  { branches: ["辰", "午", "酉", "亥"], description: "辰午酉亥自刑" },
-];
+const SELF_PUNISHMENTS: EarthlyBranch[] = ["辰", "午", "酉", "亥"];
 
 function pillarBranches(pillars: FourPillars): Array<{ key: string; branch: EarthlyBranch }> {
   return [
@@ -95,6 +99,48 @@ function matchPair(
   return foundA && foundB ? keys : null;
 }
 
+function uniquePresent(
+  group: EarthlyBranch[],
+  branches: EarthlyBranch[],
+): EarthlyBranch[] {
+  return group.filter((b) => branches.includes(b));
+}
+
+function keysForBranches(
+  entries: Array<{ key: string; branch: EarthlyBranch }>,
+  target: EarthlyBranch[],
+): string[] {
+  return entries.filter((e) => target.includes(e.branch)).map((e) => e.key);
+}
+
+function sanHeDescription(
+  group: EarthlyBranch[],
+  element: string,
+  present: EarthlyBranch[],
+): string {
+  if (present.length === 3) return `${group.join("")}三合${element}局`;
+  const hasFirst = present.includes(group[0]);
+  const hasMiddle = present.includes(group[1]);
+  const hasLast = present.includes(group[2]);
+  if ((hasFirst && hasMiddle) || (hasMiddle && hasLast)) {
+    return `${present.join("")}半合${element}势倾向`;
+  }
+  return `${present.join("")}拱合${element}势倾向`;
+}
+
+function sanHuiDescription(
+  group: EarthlyBranch[],
+  element: string,
+  present: EarthlyBranch[],
+): string {
+  if (present.length === 3) return `${group.join("")}三会${element}势`;
+  return `${present.join("")}半会${element}势倾向`;
+}
+
+function countBranch(branches: EarthlyBranch[], branch: EarthlyBranch): number {
+  return branches.filter((b) => b === branch).length;
+}
+
 export function analyzeBranchRelations(
   pillars: FourPillars,
 ): { analysis: BranchRelationsAnalysis; step: CalculationStep } {
@@ -115,31 +161,34 @@ export function analyzeBranchRelations(
         branches: he.pair,
         pillars: keys,
         description: `合${he.element}`,
+        confidence: 75,
       });
       interpretationTags.push("地支六合");
     }
   }
 
   for (const sh of SAN_HE) {
-    const present = sh.group.filter((b) => branches.includes(b));
+    const present = uniquePresent(sh.group, branches);
     if (present.length >= 2) {
       meetings.push({
         type: "三合",
         branches: present,
-        pillars: entries.filter((e) => present.includes(e.branch)).map((e) => e.key),
-        description: `三合${sh.element}局（${present.length}/3）`,
+        pillars: keysForBranches(entries, present),
+        description: sanHeDescription(sh.group, sh.element, present),
+        confidence: present.length === 3 ? 90 : 55,
       });
     }
   }
 
   for (const sh of SAN_HUI) {
-    const present = sh.group.filter((b) => branches.includes(b));
+    const present = uniquePresent(sh.group, branches);
     if (present.length >= 2) {
       meetings.push({
         type: "三会",
         branches: present,
-        pillars: entries.filter((e) => present.includes(e.branch)).map((e) => e.key),
-        description: `三会${sh.element}（${present.length}/3）`,
+        pillars: keysForBranches(entries, present),
+        description: sanHuiDescription(sh.group, sh.element, present),
+        confidence: present.length === 3 ? 90 : 55,
       });
     }
   }
@@ -152,6 +201,7 @@ export function analyzeBranchRelations(
         branches: pair,
         pillars: keys,
         description: "六冲",
+        confidence: 80,
       });
       interpretationTags.push("地支六冲");
     }
@@ -165,38 +215,57 @@ export function analyzeBranchRelations(
         branches: pair,
         pillars: keys,
         description: "六害",
+        confidence: 70,
       });
     }
   }
 
-  for (const rule of XING_RULES) {
-    const present = rule.branches.filter((b) => branches.includes(b));
-    if (rule.branches.length === 2 && present.length === 2) {
+  const ziMao = matchPair(entries, ["子", "卯"]);
+  if (ziMao) {
+    punishments.push({
+      type: "刑",
+      branches: ["子", "卯"],
+      pillars: ziMao,
+      description: "子卯刑",
+      confidence: 85,
+    });
+  }
+
+  for (const group of [
+    { branches: ["寅", "巳", "申"] as EarthlyBranch[], label: "寅巳申三刑" },
+    { branches: ["丑", "未", "戌"] as EarthlyBranch[], label: "丑未戌三刑" },
+  ]) {
+    const present = uniquePresent(group.branches, branches);
+    if (present.length === 3) {
       punishments.push({
         type: "刑",
         branches: present,
-        pillars: entries.filter((e) => present.includes(e.branch)).map((e) => e.key),
-        description: rule.description,
+        pillars: keysForBranches(entries, present),
+        description: `${group.label}成立`,
+        confidence: 90,
       });
-    } else if (rule.branches.length >= 3 && present.length >= 2) {
+    } else if (present.length === 2) {
       punishments.push({
-        type: "刑",
+        type: "刑势倾向",
         branches: present,
-        pillars: entries.filter((e) => present.includes(e.branch)).map((e) => e.key),
-        description: rule.description,
+        pillars: keysForBranches(entries, present),
+        description: `${present.join("")}刑势倾向（${group.label}未全）`,
+        confidence: 55,
       });
-    } else if (rule.description.includes("自刑") && present.length >= 1) {
-      const self = present.filter(
-        (b, _, arr) => arr.filter((x) => x === b).length >= 2 || rule.branches.includes(b),
-      );
-      if (self.length >= 1) {
-        punishments.push({
-          type: "刑",
-          branches: present,
-          pillars: entries.filter((e) => present.includes(e.branch)).map((e) => e.key),
-          description: rule.description,
-        });
-      }
+    }
+  }
+
+  for (const branch of SELF_PUNISHMENTS) {
+    if (countBranch(branches, branch) >= 2) {
+      punishments.push({
+        type: "自刑",
+        branches: entries
+          .filter((e) => e.branch === branch)
+          .map((e) => e.branch),
+        pillars: entries.filter((e) => e.branch === branch).map((e) => e.key),
+        description: `${branch}${branch}自刑`,
+        confidence: 85,
+      });
     }
   }
 
@@ -215,9 +284,9 @@ export function analyzeBranchRelations(
       step: "branch_relations",
       title: "地支合冲刑害",
       input: { branches },
-      method: "六合、三合、三会、六冲、六害、刑",
+      method: "六合、三合/半合/拱合、三会/半会、六冲、六害、刑与自刑",
       result: analysis as unknown as Record<string, unknown>,
-      notes: ["神煞与合冲仅作辅助标签，不作绝对判断"],
+      notes: ["两支只输出倾向，不按三合局或三会成立处理；单个辰午酉亥不触发自刑。"],
     },
   };
 }

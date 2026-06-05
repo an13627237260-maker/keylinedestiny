@@ -17,7 +17,12 @@ import {
   pillarToString,
   type Pillar,
 } from "./ganzhi";
-import { getEffectiveBaziYear, getLiChun, getMonthBranchIndex } from "./solarTerms";
+import {
+  getEffectiveBaziYear,
+  getLiChun,
+  getMonthBranchIndex,
+  type SolarTermContext,
+} from "./solarTerms";
 import type { BaziOptions } from "../shared/validation";
 
 export interface FourPillars {
@@ -71,9 +76,10 @@ function pillarFromStemBranch(stem: HeavenlyStem, branch: EarthlyBranch): Pillar
 export function getYearPillar(
   dateTime: DateTime,
   timezone: string,
+  solarTermContext?: SolarTermContext,
 ): { pillar: Pillar; step: CalculationStep } {
-  const effective = getEffectiveBaziYear(dateTime, timezone);
-  const liChun = getLiChun(dateTime.year, timezone);
+  const effective = getEffectiveBaziYear(dateTime, timezone, solarTermContext);
+  const liChun = getLiChun(dateTime.year, timezone, solarTermContext);
   const index = getYearPillarIndex(effective.year);
   const pillar = getSexagenary(index);
 
@@ -102,10 +108,12 @@ export function getMonthPillar(
   dateTime: DateTime,
   yearStem: HeavenlyStem,
   timezone: string,
+  solarTermContext?: SolarTermContext,
 ): { pillar: Pillar; step: CalculationStep } {
   const { monthIndex, boundaryTerm, nextBoundary } = getMonthBranchIndex(
     dateTime,
     timezone,
+    solarTermContext,
   );
   const monthBranch = MONTH_BRANCHES[monthIndex];
   const yinMonthStem = YEAR_STEM_TO_YIN_MONTH_STEM[yearStem];
@@ -217,9 +225,15 @@ export function computeFourPillars(
   dateTime: DateTime,
   timezone: string,
   options: BaziOptions,
+  solarTermContext?: SolarTermContext,
 ): { pillars: FourPillars; steps: CalculationStep[] } {
-  const yearResult = getYearPillar(dateTime, timezone);
-  const monthResult = getMonthPillar(dateTime, yearResult.pillar.stem, timezone);
+  const yearResult = getYearPillar(dateTime, timezone, solarTermContext);
+  const monthResult = getMonthPillar(
+    dateTime,
+    yearResult.pillar.stem,
+    timezone,
+    solarTermContext,
+  );
   const dayResult = getDayPillar(dateTime, options);
   const hourResult = getHourPillar(dateTime, dayResult.pillar.stem);
 

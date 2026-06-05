@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import type { ZodiacSignInfo } from "./zodiac";
 
 export type FortunePeriod = "daily" | "weekly" | "monthly";
@@ -24,6 +23,15 @@ const TONES = [
   "这是娱乐型趋势参考，不代表必然发生的事件。",
 ];
 
+function stableHash(input: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 export function generateZodiacFortune(
   sign: ZodiacSignInfo,
   period: FortunePeriod,
@@ -36,9 +44,7 @@ export function generateZodiacFortune(
   career: string;
   wellness: string;
 } {
-  const seed = createHash("sha256")
-    .update(`${date}:${sign.id}:${period}`)
-    .digest("hex");
+  const seed = stableHash(`${date}:${sign.id}:${period}`);
 
   const pick = (offset: number, list: string[]) =>
     list[parseInt(seed.slice(offset, offset + 2), 16) % list.length];

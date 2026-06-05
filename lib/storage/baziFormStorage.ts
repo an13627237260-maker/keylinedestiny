@@ -21,6 +21,10 @@ export interface SavedBaziFormInput {
   focusArea: "overall" | "love" | "career" | "wealth" | "study" | "health";
   targetYear?: number;
   dayBoundaryMode: "midnight" | "ziHour";
+  useOnlineSolarTerms?: boolean;
+  useOnlineLocationCalibration?: boolean;
+  overseasCountry?: string;
+  overseasLocationQuery?: string;
   savedAt: string;
   version: 1;
 }
@@ -48,6 +52,8 @@ const DEFAULT_INPUT: Omit<
   useTrueSolarTime: true,
   focusArea: "overall",
   dayBoundaryMode: "midnight",
+  useOnlineSolarTerms: false,
+  useOnlineLocationCalibration: false,
 };
 
 function getLocalStorage(): Storage | null {
@@ -160,6 +166,23 @@ export function normalizeSavedBaziInput(raw: unknown): SavedBaziFormInput | null
     focusArea: cleanFocus(obj.focusArea),
     targetYear: cleanYear(obj.targetYear),
     dayBoundaryMode: cleanBoundary(obj.dayBoundaryMode ?? options?.dayBoundaryMode),
+    useOnlineSolarTerms:
+      typeof obj.useOnlineSolarTerms === "boolean"
+        ? obj.useOnlineSolarTerms
+        : typeof options?.useOnlineSolarTermCalibration === "boolean"
+          ? options.useOnlineSolarTermCalibration
+          : DEFAULT_INPUT.useOnlineSolarTerms,
+    useOnlineLocationCalibration:
+      typeof obj.useOnlineLocationCalibration === "boolean"
+        ? obj.useOnlineLocationCalibration
+        : typeof options?.useOnlineLocationCalibration === "boolean"
+          ? options.useOnlineLocationCalibration
+          : DEFAULT_INPUT.useOnlineLocationCalibration,
+    overseasCountry:
+      cleanString(obj.overseasCountry) ?? cleanString(options?.overseasCountry),
+    overseasLocationQuery:
+      cleanString(obj.overseasLocationQuery) ??
+      cleanString(options?.overseasLocationQuery),
     savedAt,
     version: 1,
   };

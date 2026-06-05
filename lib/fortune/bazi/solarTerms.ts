@@ -1,10 +1,21 @@
 import { DateTime } from "luxon";
 import type { CalculationStep } from "../shared/types";
+import type { DataSourceMeta, ProviderResult } from "../dataSources/types";
+import { getDataSourceLabel } from "../dataSources/providerStatus";
 
 export interface SolarTerm {
   name: string;
   index: number;
   dateTime: DateTime;
+}
+
+export interface SolarTermContext {
+  termsByYear: Record<string, SolarTerm[]>;
+  metaByYear?: Record<string, DataSourceMeta>;
+}
+
+export function solarTermContextKey(year: number, timezone: string): string {
+  return `${year}|${timezone}`;
 }
 
 /** 24节气名称，index 0=小寒 */
@@ -132,7 +143,7 @@ function computeTermDateTime(
   return dt;
 }
 
-export function getSolarTerms(year: number, timezone: string): SolarTerm[] {
+export function getBuiltInSolarTerms(year: number, timezone: string): SolarTerm[] {
   return SOLAR_TERM_NAMES.map((name, index) => ({
     name,
     index,
@@ -140,17 +151,49 @@ export function getSolarTerms(year: number, timezone: string): SolarTerm[] {
   }));
 }
 
-export function getLiChun(year: number, timezone: string): DateTime {
-  const terms = getSolarTerms(year, timezone);
+export function getSolarTerms(
+  year: number,
+  timezone: string,
+  context?: SolarTermContext,
+): SolarTerm[] {
+  return (
+    context?.termsByYear[solarTermContextKey(year, timezone)] ??
+    getBuiltInSolarTerms(year, timezone)
+  );
+}
+
+function getSolarTermMeta(
+  year: number,
+  timezone: string,
+  context?: SolarTermContext,
+): DataSourceMeta {
+  return (
+    context?.metaByYear?.[solarTermContextKey(year, timezone)] ?? {
+      sourceType: "approx_algorithm",
+      providerName: "内置寿星节气近似算法",
+      confidence: "medium",
+      fallbackUsed: false,
+      requestedOnline: false,
+      notes: ["未传入联网校准节气表，使用本地近似算法。"],
+    }
+  );
+}
+
+export function getLiChun(
+  year: number,
+  timezone: string,
+  context?: SolarTermContext,
+): DateTime {
+  const terms = getSolarTerms(year, timezone, context);
   return terms.find((t) => t.name === "立春")!.dateTime;
 }
 
 export function getMonthBoundaryTerms(
   year: number,
   timezone: string,
+  context?: SolarTermContext,
 ): SolarTerm[] {
-  const terms = getSolarTerms(year, timezone);
-  const prevYearTerms = getSolarTerms(year - 1, timezone);
+  const terms = getSolarTerms(year, timezone, context);
   const xiaoHan = terms.find((t) => t.name === "小寒")!;
   const fromPrev = MONTH_JIE_INDICES.filter((i) => i !== 0).map(
     (i) => terms.find((t) => t.index === i)!,
@@ -162,11 +205,12 @@ export function findCurrentSolarTermInterval(
   dateTime: DateTime,
   year: number,
   timezone: string,
+  context?: SolarTermContext,
 ): { previous: SolarTerm; next: SolarTerm | null } {
   const allTerms: SolarTerm[] = [
-    ...getSolarTerms(year - 1, timezone),
-    ...getSolarTerms(year, timezone),
-    ...getSolarTerms(year + 1, timezone),
+    ...getSolarTerms(year - 1, timezone, context),
+    ...getSolarTerms(year, timezone, context),
+    ...getSolarTerms(year + 1, timezone, context),
   ].sort((a, b) => a.dateTime.toMillis() - b.dateTime.toMillis());
 
   let previous = allTerms[0];
@@ -183,9 +227,10 @@ export function findCurrentSolarTermInterval(
 export function getEffectiveBaziYear(
   dateTime: DateTime,
   timezone: string,
+  context?: SolarTermContext,
 ): { year: number; liChun: DateTime; beforeLiChun: boolean } {
   const year = dateTime.year;
-  const liChun = getLiChun(year, timezone);
+  const liChun = getLiChun(year, timezone, context);
   const beforeLiChun = dateTime < liChun;
   return {
     year: beforeLiChun ? year - 1 : year,
@@ -197,12 +242,13 @@ export function getEffectiveBaziYear(
 export function getMonthBranchIndex(
   dateTime: DateTime,
   timezone: string,
+  context?: SolarTermContext,
 ): { monthIndex: number; boundaryTerm: SolarTerm; nextBoundary: SolarTerm | null } {
   const year = dateTime.year;
   const boundaries: SolarTerm[] = [];
 
   for (const y of [year - 1, year]) {
-    const terms = getSolarTerms(y, timezone);
+    const terms = getSolarTerms(y, timezone, context);
     for (const idx of MONTH_JIE_INDICES) {
       const term = terms.find((t) => t.index === idx)!;
       boundaries.push(term);
@@ -230,20 +276,25 @@ export function getMonthBranchIndex(
 export function checkSolarTermProximityWarnings(
   dateTime: DateTime,
   timezone: string,
+  context?: SolarTermContext,
 ): string[] {
   const warnings: string[] = [];
   const year = dateTime.year;
   const terms = [
-    ...getSolarTerms(year - 1, timezone),
-    ...getSolarTerms(year, timezone),
-    ...getSolarTerms(year + 1, timezone),
+    ...getSolarTerms(year - 1, timezone, context),
+    ...getSolarTerms(year, timezone, context),
+    ...getSolarTerms(year + 1, timezone, context),
   ];
 
   for (const term of terms) {
     const diffHours = Math.abs(
       dateTime.diff(term.dateTime, "hours").hours,
     );
-    if (diffHours <= 24) {
+    if (diffHours <= 2) {
+      warnings.push(
+        `出生时间非常接近节气切换，年柱或月柱建议使用精确节气表复核。相关节气：${term.name}（${term.dateTime.toFormat("yyyy-MM-dd HH:mm")}）。`,
+      );
+    } else if (diffHours <= 24) {
       warnings.push(
         `出生时间距 ${term.name}（${term.dateTime.toFormat("yyyy-MM-dd HH:mm")}）不足 24 小时，节气边界可能影响年柱或月柱结果。`,
       );
@@ -256,32 +307,51 @@ export function buildSolarTermStep(
   year: number,
   timezone: string,
   dateTime: DateTime,
+  context?: SolarTermContext,
+  calibration?: ProviderResult<SolarTerm[]>,
 ): CalculationStep {
-  const liChun = getLiChun(year, timezone);
-  const interval = findCurrentSolarTermInterval(dateTime, year, timezone);
-  const effective = getEffectiveBaziYear(dateTime, timezone);
-  const monthInfo = getMonthBranchIndex(dateTime, timezone);
+  const liChun = getLiChun(year, timezone, context);
+  const interval = findCurrentSolarTermInterval(dateTime, year, timezone, context);
+  const effective = getEffectiveBaziYear(dateTime, timezone, context);
+  const monthInfo = getMonthBranchIndex(dateTime, timezone, context);
+  const meta = calibration?.meta ?? getSolarTermMeta(year, timezone, context);
 
   return {
     step: "solar_terms",
     title: "节气与月令边界",
     input: { year, timezone, birthDateTime: dateTime.toISO() },
-    method: "年柱以立春为界；月柱以十二节为界（内置寿星公式，误差约±30分钟）",
+    method:
+      meta.sourceType === "online_verified"
+        ? "年柱以立春为界；月柱以十二节为界；本次使用联网校准节气表"
+        : "年柱以立春为界；月柱以十二节为界（内置寿星公式，误差约±30分钟）",
     result: {
-      source: "builtIn",
+      sourceType: meta.sourceType,
+      dataSource: getDataSourceLabel(meta),
+      providerName: meta.providerName,
+      requestedOnline: meta.requestedOnline ?? false,
+      fromCache: meta.fromCache ?? false,
+      "是否使用回退": meta.fallbackUsed,
       liChun: liChun.toISO(),
       effectiveYear: effective.year,
       beforeLiChun: effective.beforeLiChun,
       currentInterval: {
         previous: interval.previous.name,
+        previousAt: interval.previous.dateTime.toISO(),
         next: interval.next?.name ?? null,
+        nextAt: interval.next?.dateTime.toISO() ?? null,
       },
       monthBoundary: monthInfo.boundaryTerm.name,
+      monthBoundaryAt: monthInfo.boundaryTerm.dateTime.toISO(),
+      nextMonthBoundary: monthInfo.nextBoundary?.name ?? null,
+      nextMonthBoundaryAt: monthInfo.nextBoundary?.dateTime.toISO() ?? null,
       monthIndex: monthInfo.monthIndex,
     },
     notes: [
-      "若出生时间接近节气交节，建议复核精确交节时刻。",
-      "当前版本未启用 external 节气数据源。",
+      ...meta.notes,
+      ...(calibration?.warnings ?? []),
+      meta.sourceType === "online_verified"
+        ? "本次四柱计算已使用校准节气边界。"
+        : "若出生时间接近节气交节，建议复核精确交节时刻。",
     ],
   };
 }
