@@ -22,6 +22,7 @@ export interface LuckCycleAnalysis {
   startAge: number;
   startDateApprox: string;
   cycles: LuckCycleEntry[];
+  currentCycle?: LuckCycleEntry;
   warnings: string[];
 }
 
@@ -61,6 +62,7 @@ export function calculateLuckCycle(
         startAge: 0,
         startDateApprox: "",
         cycles: [],
+        currentCycle: undefined,
         warnings: ["gender unknown，不计算大运"],
       },
       step: {
@@ -131,6 +133,10 @@ export function calculateLuckCycle(
     startAge,
     startDateApprox,
     cycles,
+    currentCycle: cycles.find((cycle) => {
+      const currentYear = DateTime.now().setZone(timezone).year;
+      return currentYear >= cycle.startYear && currentYear <= cycle.endYear;
+    }),
     warnings,
   };
 
@@ -153,6 +159,14 @@ export function calculateLuckCycle(
         targetTerm: targetTerm?.name ?? null,
         daysToTerm: diffDays,
         firstCycle: cycles[0] ? pillarToString(cycles[0].pillar) : null,
+        currentCycle: analysis.currentCycle
+          ? {
+              pillar: pillarToString(analysis.currentCycle.pillar),
+              startYear: analysis.currentCycle.startYear,
+              endYear: analysis.currentCycle.endYear,
+              stemTenGod: analysis.currentCycle.stemTenGod,
+            }
+          : null,
       },
       notes: warnings,
     },

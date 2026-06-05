@@ -168,7 +168,7 @@ function buildInsights(
       "事业成长更依赖技能、经验与机遇，姓名仅作辅助参考",
     ],
     relationshipHints: [
-      `外格 ${fiveGrid.waiGe} 与人际互动风格有一定关联`,
+      `外格 ${fiveGrid.waiGe} 可作为人际互动风格的参考线索`,
       "感情相处重在沟通与尊重，不宜仅凭姓名判断缘分",
     ],
   };

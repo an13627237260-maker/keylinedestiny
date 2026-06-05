@@ -89,6 +89,7 @@ export function buildTrueSolarTimeStep(
     method:
       "中国使用标准经度 120°E；海外使用时区 UTC offset × 15 得到标准经度；修正分钟 = (出生地经度 - 标准经度) × 4",
     result: {
+      originalBeijingTime: result.originalDateTime.setZone("Asia/Shanghai").toISO(),
       standardLongitude: result.standardLongitude,
       correctionMinutes: Number(result.correctionMinutes.toFixed(2)),
       trueSolarTime: result.adjustedDateTime.toISO(),

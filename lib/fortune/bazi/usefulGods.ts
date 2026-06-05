@@ -13,6 +13,7 @@ interface UsefulGodsInput {
 export interface UsefulGodsAnalysis {
   usefulElementTendency: FiveElement[];
   avoidElementTendency: FiveElement[];
+  regulatingElementTendency: FiveElement[];
   reasoning: string[];
   confidence: number;
   caution: string;
@@ -28,6 +29,7 @@ export function analyzeUsefulGods(algo: UsefulGodsInput): {
   const reasoning: string[] = [];
   let useful: FiveElement[] = [];
   let avoid: FiveElement[] = [];
+  let regulating: FiveElement[] = [];
   let confidence = 55;
 
   const generates: Record<FiveElement, FiveElement> = {
@@ -65,22 +67,36 @@ export function analyzeUsefulGods(algo: UsefulGodsInput): {
   if (five.strongestElement === "水" && five.weakestElement === "火") {
     reasoning.push("寒湿偏重时，火土调候倾向增强");
     if (!useful.includes("火")) useful.push("火");
+    regulating.push("火", "土");
   }
   if (five.strongestElement === "火" && five.weakestElement === "水") {
     reasoning.push("燥热偏重时，水金调候倾向增强");
     if (!useful.includes("水")) useful.push("水");
+    regulating.push("水", "金");
   }
 
   if ((tg.counts["七杀"] ?? 0) > 2 && (tg.counts["食神"] ?? 0) > 1) {
     reasoning.push("杀旺食现，有通关倾向：以技能与表达缓冲压力");
+    const output = generates[dmEl];
+    regulating.push(output);
+  }
+
+  if ((tg.counts["正官"] ?? 0) + (tg.counts["七杀"] ?? 0) > 2 && (tg.counts["正印"] ?? 0) + (tg.counts["偏印"] ?? 0) > 1) {
+    reasoning.push("官杀与印星并见，印星通关倾向增强");
+    const mother = (Object.entries(generates) as [FiveElement, FiveElement][]).find(
+      ([, v]) => v === dmEl,
+    )?.[0];
+    if (mother) regulating.push(mother);
   }
 
   useful = [...new Set(useful)].slice(0, 3);
   avoid = [...new Set(avoid)].slice(0, 3);
+  regulating = [...new Set(regulating)].filter((el) => !useful.includes(el)).slice(0, 3);
 
   const analysis: UsefulGodsAnalysis = {
     usefulElementTendency: useful,
     avoidElementTendency: avoid,
+    regulatingElementTendency: regulating,
     reasoning,
     confidence,
     caution: "喜用神仅为倾向分析，不等于缺什么补什么",

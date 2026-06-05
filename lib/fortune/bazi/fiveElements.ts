@@ -16,6 +16,8 @@ export interface FiveElementsAnalysis {
   strongestElement: FiveElement;
   weakestElement: FiveElement;
   balanceScore: number;
+  elementRanking: Array<{ element: FiveElement; score: number; percentage: number }>;
+  explanation: string[];
   usefulElementTendency: FiveElement[];
   notes: string[];
 }
@@ -87,6 +89,11 @@ export function analyzeFiveElements(
   );
   const strongestElement = sorted[0][0];
   const weakestElement = sorted[sorted.length - 1][0];
+  const elementRanking = sorted.map(([element, score]) => ({
+    element,
+    score: Number(score.toFixed(2)),
+    percentage: percentages[element],
+  }));
 
   const ideal = total / 5;
   const variance =
@@ -94,6 +101,13 @@ export function analyzeFiveElements(
   const balanceScore = Math.max(0, Math.round(100 - (variance / ideal) * 20));
 
   const usefulElementTendency = sorted.slice(-2).map(([el]) => el);
+  const explanation = [
+    "天干按每柱 1.0 计入原始分。",
+    "地支主五行按每支 1.2 计入原始分。",
+    "藏干按单藏 1.0、双藏 0.7/0.3、三藏 0.6/0.3/0.1 加权。",
+    `月令${pillars.month.branch}对应${seasonElement}当令，参与季节权重修正。`,
+    "五行平衡只描述结构分布，不使用“缺什么补什么”的直接断语。",
+  ];
 
   const analysis: FiveElementsAnalysis = {
     rawScores,
@@ -102,9 +116,12 @@ export function analyzeFiveElements(
     strongestElement,
     weakestElement,
     balanceScore,
+    elementRanking,
+    explanation,
     usefulElementTendency,
     notes: [
       ...notes,
+      ...explanation,
       "喜用神倾向仅供参考，不代表绝对判断。",
       "weakestElement 不等于喜用神。",
     ],

@@ -45,4 +45,18 @@ describe("evidence driven bazi report", () => {
     expect(adviceSection?.evidence?.length).toBeGreaterThan(0);
     expect(adviceSection?.content).not.toContain("这条规则不应输出");
   });
+
+  it("报告不出现绝对化禁用词", () => {
+    const { algorithm_result } = computeBazi(INPUT);
+    const rules = runBaziRules(algorithm_result, INPUT.focusArea);
+    const report = generateBaziReport(algorithm_result, rules, INPUT);
+    const text = [
+      report.summary,
+      ...report.sections.map((section) => section.content),
+      ...report.advice,
+    ].join("");
+    for (const word of ["一定", "必然", "注定", "百分百", "必发财", "必脱单", "必复合", "改命", "逆天改运", "包上岸", "包赚钱"]) {
+      expect(text).not.toContain(word);
+    }
+  });
 });

@@ -29,7 +29,7 @@ interface ZodiacAlgoResult {
 export function generateZodiacReport(result: ZodiacAlgoResult): FortuneReport {
   const z = result.sign;
   const f = result.fortune;
-  const summary = `${z.name}（${z.element}象·${z.modality}）综合分 ${f.overallScore}，运势由确定性算法生成，同一天同星座结果一致。`;
+  const summary = `${z.name}（${z.element}象·${z.modality}）综合分 ${f.overallScore}，运势基于太阳星座和日期种子的娱乐趋势模型生成，同一天同星座结果一致。`;
   return buildReport(
     "星座运势报告",
     summary,

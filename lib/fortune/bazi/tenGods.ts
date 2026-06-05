@@ -1,5 +1,6 @@
 import type { CalculationStep } from "../shared/types";
 import {
+  BRANCH_ELEMENT,
   ELEMENT_CONTROLS,
   ELEMENT_GENERATES,
   STEM_ELEMENT,
@@ -51,6 +52,7 @@ export interface TenGodsAnalysis {
   hiddenStemGods: Array<{ branch: string; stem: HeavenlyStem; god: TenGod; weight: number }>;
   counts: Record<TenGod, number>;
   dominantTendency: TenGod[];
+  evidence: string[];
 }
 
 export function analyzeTenGods(
@@ -95,6 +97,12 @@ export function analyzeTenGods(
 
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const dominantTendency = sorted.slice(0, 3).map(([g]) => g as TenGod);
+  const evidence = [
+    `日主为${dayMaster}，以日干为基准推导其他天干与藏干十神。`,
+    `四柱天干十神：${Object.entries(pillarStemGods).map(([key, god]) => `${key}:${god}`).join("、")}。`,
+    `地支藏干十神按藏干权重计入，月支${pillars.month.branch}主五行为${BRANCH_ELEMENT[pillars.month.branch]}。`,
+    `主导十神倾向：${dominantTendency.join("、")}。`,
+  ];
 
   const analysis: TenGodsAnalysis = {
     dayMaster,
@@ -102,6 +110,7 @@ export function analyzeTenGods(
     hiddenStemGods,
     counts,
     dominantTendency,
+    evidence,
   };
 
   return {
@@ -112,7 +121,7 @@ export function analyzeTenGods(
       input: { dayMaster },
       method: "以日干为日主，按五行生克与阴阳定十神",
       result: analysis as unknown as Record<string, unknown>,
-      notes: ["十神计数含藏干加权"],
+      notes: ["十神计数含藏干加权", ...evidence],
     },
   };
 }

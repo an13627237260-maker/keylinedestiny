@@ -149,7 +149,7 @@ function buildInterpretation(input: {
 }): string {
   const label = CATEGORY_LABELS[input.category];
   const periodLabel = PERIOD_LABELS[input.period];
-  return `${input.sign.name}${periodLabel}${label}分数为${input.score}分，${scoreTone(input.score)}。本项关键词是“${input.theme}”，结合${input.sign.element}象特质与${input.sign.modality}星座的行动方式来看，${CATEGORY_FOCUS[input.category]}。建议是：${CATEGORY_ACTIONS[input.category]}。幸运方位${input.luckyDirection}可作为日常选择的小提示，例如安排座位、散步路线或整理空间时顺手参考；它只用于娱乐型趋势提醒，不代表必然事件，也不会替代现实判断。`;
+  return `${input.sign.name}${periodLabel}${label}分数为${input.score}分，${scoreTone(input.score)}。本项关键词是“${input.theme}”，结合${input.sign.element}象特质与${input.sign.modality}星座的行动方式来看，${CATEGORY_FOCUS[input.category]}。建议是：${CATEGORY_ACTIONS[input.category]}。幸运方位${input.luckyDirection}可作为日常选择的小提示，例如安排座位、散步路线或整理空间时顺手参考；它只用于娱乐型趋势提醒，不代表现实事件，也不会替代现实判断。`;
 }
 
 export function generateZodiacFortune(

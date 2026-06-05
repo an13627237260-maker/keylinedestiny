@@ -258,6 +258,9 @@ function sectionUsefulGods(algo: BaziAlgorithmResult): ReportSection | null {
     ev("useful_god", "advice", "忌神压力", `忌神倾向：${ug.avoidElementTendency.join("、") || "无显著单项"}`, 2.1, {
       relatedElements: ug.avoidElementTendency,
     }),
+    ev("useful_god", "advice", "调候通关", `调候/通关倾向：${ug.regulatingElementTendency.join("、") || "无显著单项"}`, 1.8, {
+      relatedElements: ug.regulatingElementTendency,
+    }),
     ...ug.reasoning.map((detail) => ev("useful_god", "advice", "推导", detail, 2)),
   ];
   return makeSection({

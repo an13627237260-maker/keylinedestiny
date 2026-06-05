@@ -18,6 +18,25 @@ export interface DayMasterStrengthAnalysis {
   supportFactors: string[];
   weakeningFactors: string[];
   reasoning: string[];
+  confidence: number;
+}
+
+function motherElement(element: FiveElement): FiveElement {
+  return (Object.entries(ELEMENT_GENERATES) as [FiveElement, FiveElement][]).find(
+    ([, generated]) => generated === element,
+  )![0];
+}
+
+function relationToDayMaster(
+  dayMasterElement: FiveElement,
+  targetElement: FiveElement,
+): "same" | "resource" | "output" | "wealth" | "officer" | "neutral" {
+  if (targetElement === dayMasterElement) return "same";
+  if (ELEMENT_GENERATES[targetElement] === dayMasterElement) return "resource";
+  if (ELEMENT_GENERATES[dayMasterElement] === targetElement) return "output";
+  if (ELEMENT_CONTROLS[dayMasterElement] === targetElement) return "wealth";
+  if (ELEMENT_CONTROLS[targetElement] === dayMasterElement) return "officer";
+  return "neutral";
 }
 
 export function analyzeDayMasterStrength(
@@ -27,58 +46,89 @@ export function analyzeDayMasterStrength(
   const dayMaster = pillars.day.stem;
   const dayMasterElement = STEM_ELEMENT[dayMaster];
   const monthElement = BRANCH_ELEMENT[pillars.month.branch];
+  const resourceElement = motherElement(dayMasterElement);
 
   let score = 50;
   const supportFactors: string[] = [];
   const weakeningFactors: string[] = [];
   const reasoning: string[] = [];
 
-  if (
-    monthElement === dayMasterElement ||
-    ELEMENT_GENERATES[monthElement] === dayMasterElement
-  ) {
-    score += 15;
+  const monthRelation = relationToDayMaster(dayMasterElement, monthElement);
+  if (monthRelation === "same" || monthRelation === "resource") {
+    score += 18;
     supportFactors.push("月令帮扶日主");
     reasoning.push("月支五行与日主同类或相生");
-  } else if (ELEMENT_CONTROLS[monthElement] === dayMasterElement) {
-    score -= 15;
+  } else if (monthRelation === "officer") {
+    score -= 18;
     weakeningFactors.push("月令克泄日主");
     reasoning.push("月支五行克制日主");
+  } else if (monthRelation === "output") {
+    score -= 12;
+    weakeningFactors.push("月令泄身");
+    reasoning.push("月支为日主所生，泄出日主气势");
+  } else if (monthRelation === "wealth") {
+    score -= 10;
+    weakeningFactors.push("月令耗身");
+    reasoning.push("月支为日主所克，形成财星耗身");
   }
 
   const stems = [pillars.year.stem, pillars.month.stem, pillars.hour.stem];
   for (const stem of stems) {
     const el = STEM_ELEMENT[stem];
-    if (el === dayMasterElement) {
+    const relation = relationToDayMaster(dayMasterElement, el);
+    if (relation === "same") {
       score += 8;
       supportFactors.push(`天干${stem}比劫帮身`);
-    } else if (ELEMENT_GENERATES[el] === dayMasterElement) {
+    } else if (relation === "resource") {
       score += 10;
       supportFactors.push(`天干${stem}印星生扶`);
-    } else if (ELEMENT_CONTROLS[el] === dayMasterElement) {
+    } else if (relation === "officer") {
       score -= 8;
       weakeningFactors.push(`天干${stem}官杀克身`);
-    } else if (ELEMENT_CONTROLS[dayMasterElement] === el) {
+    } else if (relation === "output") {
+      score -= 6;
+      weakeningFactors.push(`天干${stem}食伤泄身`);
+    } else if (relation === "wealth") {
       score -= 6;
       weakeningFactors.push(`天干${stem}财星耗身`);
     }
   }
 
-  for (const branch of [pillars.year.branch, pillars.day.branch, pillars.hour.branch]) {
+  for (const branch of [pillars.year.branch, pillars.month.branch, pillars.day.branch, pillars.hour.branch]) {
     const main = BRANCH_ELEMENT[branch];
     if (main === dayMasterElement) {
-      score += 6;
+      score += branch === pillars.month.branch ? 8 : 6;
       supportFactors.push(`地支${branch}有根`);
     }
     for (const hs of hiddenStems[branch] ?? []) {
       const el = STEM_ELEMENT[hs.stem];
       if (el === dayMasterElement) {
         score += 4 * hs.weight;
+        supportFactors.push(`地支${branch}藏${hs.stem}为日主根气`);
       } else if (ELEMENT_GENERATES[el] === dayMasterElement) {
         score += 5 * hs.weight;
+        supportFactors.push(`地支${branch}藏${hs.stem}印星生扶`);
+      } else if (ELEMENT_CONTROLS[el] === dayMasterElement) {
+        score -= 4 * hs.weight;
+        weakeningFactors.push(`地支${branch}藏${hs.stem}官杀克身`);
+      } else if (ELEMENT_GENERATES[dayMasterElement] === el) {
+        score -= 3 * hs.weight;
+        weakeningFactors.push(`地支${branch}藏${hs.stem}食伤泄身`);
+      } else if (ELEMENT_CONTROLS[dayMasterElement] === el) {
+        score -= 3 * hs.weight;
+        weakeningFactors.push(`地支${branch}藏${hs.stem}财星耗身`);
       }
     }
   }
+
+  const supportScore = supportFactors.length;
+  const weakenScore = weakeningFactors.length;
+  reasoning.push(
+    `日主${dayMaster}属${dayMasterElement}，印星元素为${resourceElement}，月令权重最高。`,
+  );
+  reasoning.push(
+    `支持因素 ${supportScore} 项，克泄耗因素 ${weakenScore} 项，综合评分用于 strong/balanced/weak 分层。`,
+  );
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   let strengthLevel: DayMasterStrengthAnalysis["strengthLevel"] = "balanced";
@@ -93,6 +143,7 @@ export function analyzeDayMasterStrength(
     supportFactors,
     weakeningFactors,
     reasoning,
+    confidence: Math.min(90, Math.max(55, 60 + Math.abs(score - 50))),
   };
 
   return {

@@ -47,6 +47,21 @@ const HOUR_BRANCHES_ORDER: EarthlyBranch[] = [
   "亥",
 ];
 
+const HOUR_BRANCH_RANGES: Record<EarthlyBranch, string> = {
+  子: "23:00-00:59",
+  丑: "01:00-02:59",
+  寅: "03:00-04:59",
+  卯: "05:00-06:59",
+  辰: "07:00-08:59",
+  巳: "09:00-10:59",
+  午: "11:00-12:59",
+  未: "13:00-14:59",
+  申: "15:00-16:59",
+  酉: "17:00-18:59",
+  戌: "19:00-20:59",
+  亥: "21:00-22:59",
+};
+
 export function getHourBranch(hour: number): EarthlyBranch {
   if (hour === 23 || hour === 0) return "子";
   if (hour >= 1 && hour <= 2) return "丑";
@@ -129,7 +144,9 @@ export function getMonthPillar(
       method: "月支按十二节令；月干由年干五虎遁日起",
       result: {
         boundaryTerm: boundaryTerm.name,
+        boundaryAt: boundaryTerm.dateTime.toISO(),
         nextBoundary: nextBoundary?.name ?? null,
+        nextBoundaryAt: nextBoundary?.dateTime.toISO() ?? null,
         monthBranch,
         yinMonthStem,
         monthStem,
@@ -212,7 +229,9 @@ export function getHourPillar(
       result: {
         hour,
         hourBranch,
+        hourRange: HOUR_BRANCH_RANGES[hourBranch],
         ziHourStem,
+        fiveRatRule: `${dayStem}日${ziHourStem}子时起`,
         hourStem,
         pillar: pillarToString(pillar),
       },
