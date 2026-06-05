@@ -30,5 +30,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "fortune-mingli-deploy",
+    "fortune-mingli-deploy 2",
+    "lib/generated"
+  ]
 }

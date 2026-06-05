@@ -32,11 +32,11 @@ import { drawTarotReading } from "@/lib/fortune/tarot";
 import { TAROT_DECK } from "@/lib/fortune/tarot/cards";
 import { getZodiacSign } from "@/lib/fortune/zodiac";
 import { calculateFiveGrid } from "@/lib/fortune/name/analysis";
-import {
-  containsForbiddenWords,
-  validateAiReport,
-} from "@/lib/ai/consistencyChecker";
-import { buildFallbackBaziReport } from "@/lib/ai/baziFallback";
+import { runBaziRules, ALL_BAZI_RULES } from "@/lib/fortune/rules/baziRules";
+import { generateBaziReport } from "@/lib/fortune/report/baziReport";
+import { reportTotalChars } from "@/lib/fortune/report/templateEngine";
+import { getGrowthStage } from "@/lib/fortune/bazi/twelveGrowthStages";
+import { getNayin } from "@/lib/fortune/bazi/nayin";
 
 describe("天干地支基础映射", () => {
   it("十天干十二地支长度正确", () => {
@@ -270,20 +270,12 @@ describe("姓名五格", () => {
   });
 });
 
-describe("AI fallback", () => {
-  it("禁止词过滤", () => {
-    const bad = JSON.stringify({
-      summary: "你一定会发财",
-      key_points: [],
-      advice: [],
-      warnings: [],
-      disclaimer: "娱乐",
-    });
-    const result = validateAiReport(bad, { pillarStrings: { day: "甲子" } });
-    expect(result.ok).toBe(false);
+describe("规则引擎与报告", () => {
+  it("规则库不少于 200 条", () => {
+    expect(ALL_BAZI_RULES.length).toBeGreaterThanOrEqual(200);
   });
 
-  it("fallback 报告", () => {
+  it("八字报告不少于 1200 字且含核心章节", () => {
     const { algorithm_result } = computeBazi({
       gender: "male",
       birthDate: "1990-05-15",
@@ -291,14 +283,36 @@ describe("AI fallback", () => {
       timezone: "Asia/Shanghai",
       useTrueSolarTime: false,
       focusArea: "overall",
+      targetYear: 2026,
     });
-    const fb = buildFallbackBaziReport(
-      algorithm_result as unknown as Record<string, unknown>,
-      "overall",
-    );
-    expect(fb.summary).toContain(algorithm_result.pillarStrings.year);
-    expect(fb.advice.length).toBeGreaterThanOrEqual(5);
-    expect(containsForbiddenWords("一定")).toContain("一定");
+    const rules = runBaziRules(algorithm_result, "overall");
+    expect(rules.length).toBeGreaterThan(0);
+    const report = generateBaziReport(algorithm_result, rules, {
+      focusArea: "overall",
+      targetYear: 2026,
+    });
+    const allText = [
+      report.summary,
+      ...report.sections.map((s) => s.content),
+      ...report.advice,
+    ].join("");
+    expect(reportTotalChars(report)).toBeGreaterThanOrEqual(1200);
+    expect(allText).toContain(algorithm_result.pillarStrings.year);
+    expect(allText).toContain("日主");
+    expect(allText).toContain("五行");
+    expect(allText).toContain("十神");
+    expect(allText).toContain("大运");
+    expect(allText).toContain("流年");
+    expect(report.advice.length).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe("纳音与十二长生", () => {
+  it("甲子纳音", () => {
+    expect(getNayin(getSexagenary(0))).toBe("海中金");
+  });
+  it("十二长生", () => {
+    expect(getGrowthStage("甲", "亥")).toBe("长生");
   });
 });
 

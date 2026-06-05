@@ -1,18 +1,147 @@
 @import "tailwindcss";
 
+/* ─── Keyline Destiny Design System ─── */
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --bg-deep: #080611;
+  --bg-main: #0d0a18;
+  --bg-card: rgba(24, 20, 38, 0.72);
+  --bg-card-solid: #171325;
+
+  --purple-primary: #8b5cf6;
+  --purple-deep: #4c1d95;
+  --purple-soft: #c4b5fd;
+
+  --gold-main: #d6b56d;
+  --gold-soft: #f1d99a;
+  --gold-dark: #8a6a2f;
+
+  --text-main: #f7f1e5;
+  --text-muted: #a8a0ba;
+  --text-dim: #6f6782;
+
+  --border-soft: rgba(214, 181, 109, 0.22);
+  --border-purple: rgba(139, 92, 246, 0.28);
+
+  --danger: #e06b6b;
+  --success: #6dd6a0;
+  --warning: #d6b56d;
+
+  --element-wood: #2f9e75;
+  --element-fire: #c94a4a;
+  --element-earth: #c9a227;
+  --element-metal: #b8c0cc;
+  --element-water: #3a6ea5;
+
+  --font-serif: "Songti SC", "STSong", "Noto Serif SC", Georgia, serif;
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+
+  --header-height: 3.5rem;
+  --mobile-nav-height: 4rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg-deep: var(--bg-deep);
+  --color-bg-main: var(--bg-main);
+  --color-bg-card: var(--bg-card);
+  --color-purple-primary: var(--purple-primary);
+  --color-gold-main: var(--gold-main);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --font-sans: var(--font-sans);
+}
+
+@keyframes cosmic-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+  50% { transform: translate(2%, -1%) scale(1.05); opacity: 0.55; }
+}
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes wheel-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.15); }
+  50% { box-shadow: 0 0 32px rgba(214, 181, 109, 0.2); }
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-main);
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-serif);
+}
+
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-soft);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.gold-line::after {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 2px;
+  margin-top: 0.75rem;
+  background: linear-gradient(90deg, var(--gold-main), transparent);
+}
+
+.mystic-input {
+  background: rgba(8, 6, 17, 0.6);
+  border: 1px solid var(--border-purple);
+  color: var(--text-main);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mystic-input:focus {
+  outline: none;
+  border-color: var(--gold-main);
+  box-shadow: 0 0 0 2px rgba(214, 181, 109, 0.15), 0 0 16px rgba(139, 92, 246, 0.12);
+}
+
+.mystic-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* date/time inputs dark mode */
+.mystic-input[type="date"],
+.mystic-input[type="time"] {
+  color-scheme: dark;
+}
+
+/* scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
 }

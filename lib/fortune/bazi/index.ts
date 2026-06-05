@@ -21,6 +21,11 @@ import { analyzeSymbolicStars } from "./symbolicStars";
 import { analyzeTenGods } from "./tenGods";
 import { calculateTrueSolarTime, buildTrueSolarTimeStep } from "./trueSolarTime";
 import { analyzeYearlyLuck } from "./yearlyLuck";
+import { analyzeTwelveGrowthStages } from "./twelveGrowthStages";
+import { analyzeNayin } from "./nayin";
+import { analyzePatterns } from "./patterns";
+import { analyzeUsefulGods } from "./usefulGods";
+import { analyzeMonthlyLuck } from "./monthlyLuck";
 
 export interface BaziAlgorithmResult {
   pillars: ReturnType<typeof computeFourPillars>["pillars"];
@@ -37,8 +42,13 @@ export interface BaziAlgorithmResult {
   stemRelations: ReturnType<typeof analyzeStemRelations>["analysis"];
   branchRelations: ReturnType<typeof analyzeBranchRelations>["analysis"];
   symbolicStars: ReturnType<typeof analyzeSymbolicStars>["stars"];
+  twelveGrowthStages: ReturnType<typeof analyzeTwelveGrowthStages>["stages"];
+  nayin: ReturnType<typeof analyzeNayin>["nayin"];
+  patternTendencies: ReturnType<typeof analyzePatterns>["tendencies"];
+  usefulGods: ReturnType<typeof analyzeUsefulGods>["analysis"];
   luckCycle: ReturnType<typeof calculateLuckCycle>["analysis"];
   yearlyLuck?: ReturnType<typeof analyzeYearlyLuck>["analysis"];
+  monthlyLuck?: ReturnType<typeof analyzeMonthlyLuck>["months"];
 }
 
 export function computeBazi(input: BaziInput): {
@@ -116,7 +126,15 @@ export function computeBazi(input: BaziInput): {
   steps.push(luckCycleResult.step);
   warnings.push(...luckCycleResult.analysis.warnings);
 
+  const growthResult = analyzeTwelveGrowthStages(pillars);
+  steps.push(growthResult.step);
+
+  const nayinResult = analyzeNayin(pillars);
+  steps.push(nayinResult.step);
+
   let yearlyLuckAnalysis;
+  let monthlyLuckAnalysis;
+  const targetYear = input.targetYear ?? dateTime.year;
   if (input.targetYear) {
     const yearlyResult = analyzeYearlyLuck(
       input.targetYear,
@@ -128,6 +146,42 @@ export function computeBazi(input: BaziInput): {
     steps.push(yearlyResult.step);
     yearlyLuckAnalysis = yearlyResult.analysis;
   }
+
+  const monthlyResult = analyzeMonthlyLuck(
+    targetYear,
+    pillars,
+    input.focusArea,
+  );
+  steps.push(monthlyResult.step);
+  monthlyLuckAnalysis = monthlyResult.months;
+
+  const partialAlgo = {
+    pillars,
+    pillarStrings: {
+      year: pillarToString(pillars.year),
+      month: pillarToString(pillars.month),
+      day: pillarToString(pillars.day),
+      hour: pillarToString(pillars.hour),
+    },
+    effectiveDateTime: dateTime.toISO() ?? "",
+    tenGods: tenGodsResult.analysis,
+    fiveElements: fiveElementsResult.analysis,
+    dayMasterStrength: dayMasterResult.analysis,
+    stemRelations: stemRelationsResult.analysis,
+    branchRelations: branchRelationsResult.analysis,
+    symbolicStars: symbolicStarsResult.stars,
+    twelveGrowthStages: growthResult.stages,
+    nayin: nayinResult.nayin,
+    luckCycle: luckCycleResult.analysis,
+    yearlyLuck: yearlyLuckAnalysis,
+    monthlyLuck: monthlyLuckAnalysis,
+  } as BaziAlgorithmResult;
+
+  const patternsResult = analyzePatterns(partialAlgo);
+  steps.push(patternsResult.step);
+
+  const usefulGodsResult = analyzeUsefulGods(partialAlgo);
+  steps.push(usefulGodsResult.step);
 
   const algorithm_result: BaziAlgorithmResult = {
     pillars,
@@ -144,8 +198,13 @@ export function computeBazi(input: BaziInput): {
     stemRelations: stemRelationsResult.analysis,
     branchRelations: branchRelationsResult.analysis,
     symbolicStars: symbolicStarsResult.stars,
+    twelveGrowthStages: growthResult.stages,
+    nayin: nayinResult.nayin,
+    patternTendencies: patternsResult.tendencies,
+    usefulGods: usefulGodsResult.analysis,
     luckCycle: luckCycleResult.analysis,
     yearlyLuck: yearlyLuckAnalysis,
+    monthlyLuck: monthlyLuckAnalysis,
   };
 
   return {

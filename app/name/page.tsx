@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { PageShell } from "@/components/layout/site-header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input, Label, Select } from "@/components/ui/input";
-import {
-  CalculationStepsPanel,
-  DisclaimerBanner,
-} from "@/components/fortune/calculation-steps";
-import { DISCLAIMER } from "@/lib/fortune/shared/constants";
+import { motion } from "framer-motion";
+import { AppShell } from "@/components/layout/AppShell";
+import { SectionTitle } from "@/components/ui/section-title";
+import { MysticCard } from "@/components/ui/mystic-card";
+import { MysticButton } from "@/components/ui/mystic-button";
+import { FormFieldShell } from "@/components/ui/form-field-shell";
+import { PillBadge } from "@/components/ui/pill-badge";
+import type { FortuneReport } from "@/lib/fortune/shared/reportTypes";
 
 export default function NamePage() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<{
+    algorithm_result: Record<string, unknown>;
+    report: FortuneReport;
+  } | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,69 +24,87 @@ export default function NamePage() {
     const res = await fetch("/api/name", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: fd.get("name"),
-        script: fd.get("script"),
-      }),
+      body: JSON.stringify({ name: fd.get("name"), script: fd.get("script") }),
     });
     const data = await res.json();
     if (data.success) setResult(data);
     setLoading(false);
   }
 
-  const algo = result?.algorithm_result as Record<string, unknown> | undefined;
+  const fg = result?.algorithm_result?.fiveGrid as Record<string, number> | undefined;
+  const tt = result?.algorithm_result?.threeTalent as { config: string } | undefined;
 
   return (
-    <PageShell>
-      <h1 className="mb-6 text-2xl font-bold text-violet-200">姓名分析</h1>
-      <DisclaimerBanner text={DISCLAIMER} />
+    <AppShell>
+      <SectionTitle eyebrow="姓名学" title="姓名分析" subtitle="五格剖象法简化模型 · 流派众多仅供参考" />
 
-      <form onSubmit={onSubmit} className="mt-6 flex flex-wrap gap-4 items-end">
-        <div>
-          <Label>姓名</Label>
-          <Input name="name" required placeholder="王小明" defaultValue="王小明" />
-        </div>
-        <div>
-          <Label>字形</Label>
-          <Select name="script" defaultValue="simplified">
-            <option value="simplified">简体</option>
-            <option value="traditional">繁体</option>
-          </Select>
-        </div>
-        <Button type="submit" disabled={loading}>
-          {loading ? "分析中..." : "分析"}
-        </Button>
-      </form>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[360px_1fr]">
+        <MysticCard title="姓名输入">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <FormFieldShell label="姓名" htmlFor="name">
+              <input id="name" name="name" required placeholder="如：王小明" className="mystic-input h-10 w-full rounded-lg px-3 text-sm" />
+            </FormFieldShell>
+            <FormFieldShell label="字形" htmlFor="script">
+              <select id="script" name="script" defaultValue="simplified" className="mystic-input h-10 w-full rounded-lg px-3 text-sm">
+                <option value="simplified">简体</option>
+                <option value="traditional">繁体</option>
+              </select>
+            </FormFieldShell>
+            <MysticButton type="submit" loading={loading} variant="primary">
+              开始分析
+            </MysticButton>
+          </form>
+        </MysticCard>
 
-      {algo && (
-        <div className="mt-8 space-y-4">
-          {(algo.missingChars as string[] | undefined)?.length ? (
-            <Card>
-              <CardContent className="pt-6 text-amber-400">
-                缺少笔画数据：{(algo.missingChars as string[]).join("、")}
-              </CardContent>
-            </Card>
+        <div>
+          {result ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+              {fg ? (
+                <MysticCard title="五格剖象" highlighted>
+                  <div className="grid grid-cols-5 gap-2 text-center">
+                    {[
+                      { k: "天格", v: fg.tianGe },
+                      { k: "人格", v: fg.renGe },
+                      { k: "地格", v: fg.diGe },
+                      { k: "外格", v: fg.waiGe },
+                      { k: "总格", v: fg.zongGe },
+                    ].map((g) => (
+                      <div key={g.k} className="rounded-xl border border-[var(--border-soft)] py-4">
+                        <p className="text-[10px] text-[var(--text-dim)]">{g.k}</p>
+                        <p className="font-display text-2xl text-[var(--gold-main)]">{g.v}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {tt && (
+                    <p className="mt-4 text-center text-sm text-[var(--text-muted)]">
+                      三才配置 <PillBadge variant="gold" className="ml-1">{tt.config}</PillBadge>
+                    </p>
+                  )}
+                </MysticCard>
+              ) : (
+                <MysticCard>
+                  <p className="text-sm text-[var(--warning)]">
+                    部分字符缺少笔画数据：{(result.algorithm_result.missingChars as string[])?.join("、")}
+                  </p>
+                </MysticCard>
+              )}
+              <MysticCard title="姓名报告">
+                <p className="text-sm leading-relaxed text-[var(--text-muted)]">{result.report.summary}</p>
+                {result.report.sections.map((s) => (
+                  <div key={s.title} className="mt-4">
+                    <h4 className="text-sm text-[var(--gold-main)]">{s.title}</h4>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">{s.content}</p>
+                  </div>
+                ))}
+              </MysticCard>
+            </motion.div>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>五格 · 评分 {String(algo.nameScore)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="text-sm">{JSON.stringify(algo.fiveGrid, null, 2)}</pre>
-              </CardContent>
-            </Card>
+            <MysticCard className="flex min-h-[240px] items-center justify-center">
+              <p className="text-sm text-[var(--text-dim)]">输入姓名后生成五格分析</p>
+            </MysticCard>
           )}
-          <Card>
-            <CardHeader>
-              <CardTitle>AI 解读</CardTitle>
-            </CardHeader>
-            <CardContent className="whitespace-pre-wrap text-sm">
-              {String(result?.ai_report ?? "")}
-            </CardContent>
-          </Card>
-          <CalculationStepsPanel steps={(result?.calculation_steps as never[]) ?? []} />
         </div>
-      )}
-    </PageShell>
+      </div>
+    </AppShell>
   );
 }

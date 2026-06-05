@@ -1,9 +1,30 @@
 "use client";
 
+import type { ReactNode } from "react";
 import * as Accordion from "@radix-ui/react-accordion";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CalculationStep } from "@/lib/fortune/shared/types";
+
+function formatResult(result: Record<string, unknown>): ReactNode {
+  const entries = Object.entries(result);
+  if (entries.length === 0) return <span className="text-[var(--text-dim)]">—</span>;
+
+  return (
+    <dl className="space-y-1.5">
+      {entries.map(([key, value]) => (
+        <div key={key} className="grid grid-cols-[minmax(6rem,30%)_1fr] gap-2 text-xs">
+          <dt className="text-[var(--text-dim)]">{key}</dt>
+          <dd className="break-words text-[var(--text-muted)]">
+            {typeof value === "object" && value !== null
+              ? JSON.stringify(value, null, 0).slice(0, 200)
+              : String(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export function CalculationStepsPanel({
   steps,
@@ -16,23 +37,23 @@ export function CalculationStepsPanel({
         <Accordion.Item
           key={`${step.step}-${i}`}
           value={`${step.step}-${i}`}
-          className="rounded-lg border border-violet-500/20 bg-zinc-950/50"
+          className="rounded-xl border border-[var(--border-soft)] bg-[rgba(8,6,17,0.4)]"
         >
           <Accordion.Header>
-            <Accordion.Trigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-violet-200 hover:bg-violet-500/5 [&[data-state=open]>svg]:rotate-180">
+            <Accordion.Trigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-[var(--purple-soft)] hover:bg-[rgba(139,92,246,0.04)] [&[data-state=open]>svg]:rotate-180">
               {step.title}
-              <ChevronDown className="h-4 w-4 transition-transform" />
+              <ChevronDown className="h-4 w-4 text-[var(--gold-main)] transition-transform" />
             </Accordion.Trigger>
           </Accordion.Header>
-          <Accordion.Content className="px-4 pb-4 text-sm text-zinc-400 data-[state=open]:animate-in">
-            <p className="mb-2 text-zinc-500">方法：{step.method}</p>
-            <pre className="mb-2 overflow-x-auto rounded bg-black/40 p-2 text-xs">
-              {JSON.stringify(step.result, null, 2)}
-            </pre>
+          <Accordion.Content className="border-t border-[var(--border-soft)] px-4 pb-4 pt-3 text-sm">
+            <p className="mb-3 text-xs text-[var(--text-dim)]">
+              方法：{step.method}
+            </p>
+            {formatResult(step.result)}
             {step.notes.length > 0 && (
-              <ul className="list-disc pl-4 text-xs text-amber-400/80">
+              <ul className="mt-3 space-y-1 border-t border-[var(--border-soft)] pt-3 text-xs text-[var(--warning)]/90">
                 {step.notes.map((n, j) => (
-                  <li key={j}>{n}</li>
+                  <li key={j}>· {n}</li>
                 ))}
               </ul>
             )}
@@ -43,9 +64,16 @@ export function CalculationStepsPanel({
   );
 }
 
-export function DisclaimerBanner({ text }: { text: string }) {
+export function DisclaimerBanner({ text, subtle }: { text: string; subtle?: boolean }) {
   return (
-    <div className={cn("rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200/90")}>
+    <div
+      className={cn(
+        "rounded-xl border px-4 py-3 text-xs leading-relaxed",
+        subtle
+          ? "border-[var(--border-soft)] bg-[rgba(8,6,17,0.4)] text-[var(--text-dim)]"
+          : "border-[rgba(214,181,109,0.25)] bg-[rgba(214,181,109,0.06)] text-[var(--text-muted)]",
+      )}
+    >
       {text}
     </div>
   );

@@ -1,87 +1,111 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageShell } from "@/components/layout/site-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DisclaimerBanner } from "@/components/fortune/calculation-steps";
-import { DISCLAIMER } from "@/lib/fortune/shared/constants";
+import { motion } from "framer-motion";
+import { Trash2, FileText } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
+import { SectionTitle } from "@/components/ui/section-title";
+import { MysticCard } from "@/components/ui/mystic-card";
+import { MysticButton } from "@/components/ui/mystic-button";
+import { PillBadge } from "@/components/ui/pill-badge";
+import {
+  listReports,
+  deleteReport,
+  clearReports,
+  type StoredReport,
+} from "@/lib/storage/localReports";
+
+const TYPE_LABELS: Record<string, string> = {
+  bazi: "八字",
+  tarot: "塔罗",
+  zodiac: "星座",
+  name: "姓名",
+  love: "合盘",
+};
 
 export default function ReportsPage() {
-  const [dbReports, setDbReports] = useState<Record<string, unknown> | null>(null);
-  const [localReports, setLocalReports] = useState<Array<{ key: string; data: Record<string, unknown> }>>([]);
+  const [reports, setReports] = useState<StoredReport[]>([]);
+  const [filter, setFilter] = useState("");
+
+  function refresh() {
+    setReports(listReports(filter ? (filter as StoredReport["type"]) : undefined));
+  }
 
   useEffect(() => {
-    fetch("/api/reports")
-      .then((r) => r.json())
-      .then(setDbReports)
-      .catch(() => null);
-
-    const items: Array<{ key: string; data: Record<string, unknown> }> = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith("report-")) {
-        try {
-          items.push({
-            key,
-            data: JSON.parse(localStorage.getItem(key) ?? "{}"),
-          });
-        } catch {
-          // skip
-        }
-      }
-    }
-    setLocalReports(items.reverse());
-  }, []);
-
-  const fortuneReports =
-    (dbReports?.algorithm_result as { fortuneReports?: unknown[] })?.fortuneReports ?? [];
+    refresh();
+  }, [filter]);
 
   return (
-    <PageShell>
-      <h1 className="mb-6 text-2xl font-bold text-violet-200">历史报告</h1>
-      <DisclaimerBanner text={DISCLAIMER} />
+    <AppShell>
+      <SectionTitle eyebrow="历史记录" title="历史报告" subtitle="本地浏览器保存 · 可随时删除" />
 
-      <section className="mt-6">
-        <h2 className="mb-3 text-lg text-violet-300">本地缓存</h2>
-        {localReports.length === 0 ? (
-          <p className="text-zinc-500">暂无本地报告</p>
-        ) : (
-          <div className="space-y-3">
-            {localReports.map(({ key, data }) => (
-              <Card key={key}>
-                <CardHeader>
-                  <CardTitle>{String(data.type)} · {key}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs text-zinc-500">
-                  <pre className="max-h-40 overflow-auto">
-                    {JSON.stringify(data.algorithm_result, null, 2)?.slice(0, 500)}...
-                  </pre>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <MysticButton variant={filter === "" ? "primary" : "secondary"} onClick={() => setFilter("")}>
+          全部
+        </MysticButton>
+        {Object.entries(TYPE_LABELS).map(([k, v]) => (
+          <MysticButton
+            key={k}
+            variant={filter === k ? "primary" : "secondary"}
+            onClick={() => setFilter(k)}
+          >
+            {v}
+          </MysticButton>
+        ))}
+        <MysticButton
+          variant="ghost"
+          onClick={() => {
+            clearReports(filter ? (filter as StoredReport["type"]) : undefined);
+            refresh();
+          }}
+        >
+          清空记录
+        </MysticButton>
+      </div>
 
-      <section className="mt-8">
-        <h2 className="mb-3 text-lg text-violet-300">数据库记录</h2>
-        {fortuneReports.length === 0 ? (
-          <p className="text-zinc-500">暂无数据库报告（需运行 prisma migrate）</p>
+      <div className="mt-8 space-y-4">
+        {reports.length === 0 ? (
+          <MysticCard className="flex flex-col items-center py-16 text-center">
+            <FileText className="mb-4 h-10 w-10 text-[var(--text-dim)]" />
+            <p className="font-display text-lg text-[var(--text-muted)]">暂无本地报告</p>
+            <p className="mt-2 text-xs text-[var(--text-dim)]">完成测算后会自动保存至此</p>
+          </MysticCard>
         ) : (
-          <div className="space-y-3">
-            {(fortuneReports as Array<{ id: string; type: string; createdAt: string }>).map((r) => (
-              <Card key={r.id}>
-                <CardHeader>
-                  <CardTitle>{r.type}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-zinc-400">
-                  {new Date(r.createdAt).toLocaleString()}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          reports.map((r, i) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.03 }}
+            >
+              <MysticCard>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PillBadge variant="purple">{TYPE_LABELS[r.type] ?? r.type}</PillBadge>
+                      <h3 className="font-display font-semibold text-[var(--text-main)]">{r.title}</h3>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-[var(--text-muted)]">{r.summary}</p>
+                    <p className="mt-2 text-[10px] text-[var(--text-dim)]">
+                      {new Date(r.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <MysticButton
+                    variant="ghost"
+                    onClick={() => {
+                      deleteReport(r.id);
+                      refresh();
+                    }}
+                    className="shrink-0 px-2"
+                  >
+                    <Trash2 className="h-4 w-4 text-[var(--text-dim)]" />
+                  </MysticButton>
+                </div>
+              </MysticCard>
+            </motion.div>
+          ))
         )}
-      </section>
-    </PageShell>
+      </div>
+    </AppShell>
   );
 }

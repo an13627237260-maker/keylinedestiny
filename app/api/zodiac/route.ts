@@ -1,6 +1,6 @@
 import { generateZodiacFortune, getZodiacById, getZodiacSign } from "@/lib/fortune/zodiac";
 import { zodiacInputSchema } from "@/lib/fortune/shared/validation";
-import { generateZodiacReport } from "@/lib/ai/reportGenerator";
+import { generateZodiacReport } from "@/lib/fortune/report/zodiacReport";
 import { successResponse, errorResponse } from "@/lib/api/response";
 
 export async function POST(request: Request) {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     const fortune = generateZodiacFortune(sign, input.period, date);
     const algorithm_result = { sign, fortune, period: input.period, date };
-    const ai = await generateZodiacReport(algorithm_result);
+    const report = generateZodiacReport(algorithm_result);
 
     return successResponse(
       "zodiac",
@@ -31,7 +31,8 @@ export async function POST(request: Request) {
           notes: ["娱乐型趋势解读，同一天同星座输出稳定"],
         },
       ],
-      ai.text,
+      report,
+      [],
     );
   } catch (error) {
     return errorResponse(error);

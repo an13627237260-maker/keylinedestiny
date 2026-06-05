@@ -10,7 +10,7 @@ export const FOCUS_AREA_LABELS: Record<string, string> = {
   career: "事业",
   wealth: "财运",
   study: "学业",
-  health: "健康",
+  health: "生活方式",
 };
 
 export const GENDER_LABELS: Record<string, string> = {

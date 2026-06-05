@@ -1,6 +1,6 @@
 import { analyzeName } from "@/lib/fortune/name";
 import { nameInputSchema } from "@/lib/fortune/shared/validation";
-import { generateNameReport } from "@/lib/ai/reportGenerator";
+import { generateNameReport } from "@/lib/fortune/report/nameReport";
 import { successResponse, errorResponse } from "@/lib/api/response";
 
 export async function POST(request: Request) {
@@ -11,14 +11,17 @@ export async function POST(request: Request) {
       input.name,
       input.script,
     );
-    const ai = await generateNameReport(algorithm_result);
+    const report = generateNameReport(
+      algorithm_result as unknown as Parameters<typeof generateNameReport>[0],
+    );
 
     return successResponse(
       "name",
       input,
       algorithm_result,
       calculation_steps,
-      ai.text,
+      report,
+      [],
       warnings,
     );
   } catch (error) {

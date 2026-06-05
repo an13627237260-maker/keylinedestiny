@@ -304,11 +304,208 @@ export function findVoidness(pillars: FourPillars): SymbolicStar {
   };
 }
 
+/** 将星：以年支或日支查 */
+export function findGeneralStar(pillars: FourPillars): SymbolicStar {
+  const map: Partial<Record<EarthlyBranch, EarthlyBranch>> = {
+    寅: "午", 午: "午", 戌: "午",
+    申: "子", 子: "子", 辰: "子",
+    巳: "酉", 酉: "酉", 丑: "酉",
+    亥: "卯", 卯: "卯", 未: "卯",
+  };
+  const positions: string[] = [];
+  for (const ref of [pillars.year.branch, pillars.day.branch]) {
+    const target = map[ref];
+    if (!target) continue;
+    for (const [key, branch] of Object.entries({
+      year: pillars.year.branch, month: pillars.month.branch,
+      day: pillars.day.branch, hour: pillars.hour.branch,
+    })) {
+      if (branch === target) positions.push(key);
+    }
+  }
+  return { name: "将星", found: positions.length > 0, positions, basedOn: "年支/日支查将星", meaning: "组织、领导、担当", strength: positions.length > 0 ? "中" : "弱", caution: "领导气质标签" };
+}
+
+export function findTaiJiNoble(pillars: FourPillars): SymbolicStar {
+  const map: Partial<Record<HeavenlyStem, EarthlyBranch[]>> = {
+    甲: ["子", "午"], 乙: ["子", "午"], 丙: ["卯", "酉"], 丁: ["卯", "酉"],
+    戊: ["辰", "戌", "丑", "未"], 己: ["辰", "戌", "丑", "未"],
+    庚: ["寅", "亥"], 辛: ["寅", "亥"], 壬: ["巳", "申"], 癸: ["巳", "申"],
+  };
+  const targets = map[pillars.day.stem] ?? [];
+  const positions: string[] = [];
+  for (const [key, branch] of Object.entries({
+    year: pillars.year.branch, month: pillars.month.branch,
+    day: pillars.day.branch, hour: pillars.hour.branch,
+  })) {
+    if (targets.includes(branch)) positions.push(key);
+  }
+  return { name: "太极贵人", found: positions.length > 0, positions, basedOn: "日干查太极贵人", meaning: "玄学、哲学、深层思考", strength: positions.length > 0 ? "中" : "弱", caution: "兴趣倾向" };
+}
+
+export function findNationalSeal(pillars: FourPillars): SymbolicStar {
+  const map: Record<HeavenlyStem, EarthlyBranch> = {
+    甲: "戌", 乙: "亥", 丙: "丑", 丁: "寅", 戊: "丑",
+    己: "寅", 庚: "辰", 辛: "巳", 壬: "未", 癸: "申",
+  };
+  const target = map[pillars.day.stem];
+  const positions: string[] = [];
+  for (const [key, branch] of Object.entries({
+    year: pillars.year.branch, month: pillars.month.branch,
+    day: pillars.day.branch, hour: pillars.hour.branch,
+  })) {
+    if (branch === target) positions.push(key);
+  }
+  return { name: "国印贵人", found: positions.length > 0, positions, basedOn: "日干查国印", meaning: "信用、名誉、制度缘", strength: positions.length > 0 ? "中" : "弱", caution: "辅助标签" };
+}
+
+export function findFuStar(pillars: FourPillars): SymbolicStar {
+  const map: Partial<Record<HeavenlyStem, EarthlyBranch>> = {
+    甲: "寅", 乙: "丑", 丙: "子", 丁: "亥", 戊: "酉",
+    己: "申", 庚: "未", 辛: "午", 壬: "巳", 癸: "辰",
+  };
+  const target = map[pillars.day.stem];
+  const positions: string[] = [];
+  if (target) {
+    for (const [key, branch] of Object.entries({
+      year: pillars.year.branch, month: pillars.month.branch,
+      day: pillars.day.branch, hour: pillars.hour.branch,
+    })) {
+      if (branch === target) positions.push(key);
+    }
+  }
+  return { name: "福星贵人", found: positions.length > 0, positions, basedOn: "日干查福星", meaning: "福禄、顺遂感", strength: positions.length > 0 ? "弱" : "弱", caution: "娱乐参考" };
+}
+
+export function findTianDe(pillars: FourPillars): SymbolicStar {
+  const monthToStem: Partial<Record<EarthlyBranch, HeavenlyStem>> = {
+    寅: "丁", 辰: "壬", 巳: "辛", 未: "甲", 申: "癸", 戌: "丙", 亥: "乙", 丑: "庚",
+  };
+  const monthToBranch: Partial<Record<EarthlyBranch, EarthlyBranch>> = {
+    卯: "申", 午: "亥", 酉: "寅", 子: "巳",
+  };
+  const positions: string[] = [];
+  const stemTarget = monthToStem[pillars.month.branch];
+  if (stemTarget) {
+    for (const [key, stem] of Object.entries({
+      year: pillars.year.stem, month: pillars.month.stem,
+      day: pillars.day.stem, hour: pillars.hour.stem,
+    })) {
+      if (stem === stemTarget) positions.push(key);
+    }
+  }
+  const branchTarget = monthToBranch[pillars.month.branch];
+  if (branchTarget) {
+    for (const [key, branch] of Object.entries({
+      year: pillars.year.branch, month: pillars.month.branch,
+      day: pillars.day.branch, hour: pillars.hour.branch,
+    })) {
+      if (branch === branchTarget) positions.push(key);
+    }
+  }
+  return { name: "天德贵人", found: positions.length > 0, positions, basedOn: "月支查天德", meaning: "化解、贵人、顺遂", strength: positions.length > 0 ? "中" : "弱", caution: "辅助参考" };
+}
+
+export function findYueDe(pillars: FourPillars): SymbolicStar {
+  const groups: Array<{ months: EarthlyBranch[]; target: HeavenlyStem }> = [
+    { months: ["寅", "午", "戌"], target: "丙" },
+    { months: ["申", "子", "辰"], target: "壬" },
+    { months: ["亥", "卯", "未"], target: "甲" },
+    { months: ["巳", "酉", "丑"], target: "庚" },
+  ];
+  let targetStem: HeavenlyStem | undefined;
+  for (const g of groups) {
+    if (g.months.includes(pillars.month.branch)) {
+      targetStem = g.target;
+      break;
+    }
+  }
+  const positions: string[] = [];
+  if (targetStem) {
+    for (const [key, stem] of Object.entries({
+      year: pillars.year.stem, month: pillars.month.stem,
+      day: pillars.day.stem, hour: pillars.hour.stem,
+    })) {
+      if (stem === targetStem) positions.push(key);
+    }
+  }
+  return { name: "月德贵人", found: positions.length > 0, positions, basedOn: "月支查月德干", meaning: "温和、人缘、化解", strength: positions.length > 0 ? "中" : "弱", caution: "辅助参考" };
+}
+
+export function findHongLuan(pillars: FourPillars): SymbolicStar {
+  const branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+  const yearIdx = branches.indexOf(pillars.year.branch);
+  const target = branches[(yearIdx + 1) % 12];
+  const positions: string[] = [];
+  for (const [key, branch] of Object.entries({
+    year: pillars.year.branch, month: pillars.month.branch,
+    day: pillars.day.branch, hour: pillars.hour.branch,
+  })) {
+    if (branch === target) positions.push(key);
+  }
+  return { name: "红鸾", found: positions.length > 0, positions, basedOn: "年支查红鸾", meaning: "喜庆、姻缘、社交", strength: positions.length > 0 ? "中" : "弱", caution: "不代表必然结婚" };
+}
+
+export function findTianXi(pillars: FourPillars): SymbolicStar {
+  const branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+  const yearIdx = branches.indexOf(pillars.year.branch);
+  const target = branches[(yearIdx + 11) % 12];
+  const positions: string[] = [];
+  for (const [key, branch] of Object.entries({
+    year: pillars.year.branch, month: pillars.month.branch,
+    day: pillars.day.branch, hour: pillars.hour.branch,
+  })) {
+    if (branch === target) positions.push(key);
+  }
+  return { name: "天喜", found: positions.length > 0, positions, basedOn: "年支查天喜", meaning: "喜庆、好消息", strength: positions.length > 0 ? "中" : "弱", caution: "娱乐参考" };
+}
+
+export function findXianChi(pillars: FourPillars): SymbolicStar {
+  return { ...findPeachBlossom(pillars), name: "咸池", basedOn: "与桃花同法", meaning: "魅力、情感、人缘", caution: "仅供娱乐" };
+}
+
+export function findGuChen(pillars: FourPillars): SymbolicStar {
+  const map: Partial<Record<EarthlyBranch, EarthlyBranch>> = {
+    寅: "巳", 卯: "巳", 辰: "巳", 巳: "申", 午: "申", 未: "申",
+    申: "亥", 酉: "亥", 戌: "亥", 亥: "寅", 子: "寅", 丑: "寅",
+  };
+  const target = map[pillars.year.branch];
+  const positions: string[] = [];
+  if (target) {
+    for (const [key, branch] of Object.entries({
+      year: pillars.year.branch, month: pillars.month.branch,
+      day: pillars.day.branch, hour: pillars.hour.branch,
+    })) {
+      if (branch === target) positions.push(key);
+    }
+  }
+  return { name: "孤辰", found: positions.length > 0, positions, basedOn: "年支查孤辰", meaning: "独处、独立", strength: positions.length > 0 ? "弱" : "弱", caution: "性格标签非定论" };
+}
+
+export function findGuaSu(pillars: FourPillars): SymbolicStar {
+  const map: Partial<Record<EarthlyBranch, EarthlyBranch>> = {
+    寅: "丑", 卯: "丑", 辰: "丑", 巳: "辰", 午: "辰", 未: "辰",
+    申: "未", 酉: "未", 戌: "未", 亥: "戌", 子: "戌", 丑: "戌",
+  };
+  const target = map[pillars.year.branch];
+  const positions: string[] = [];
+  if (target) {
+    for (const [key, branch] of Object.entries({
+      year: pillars.year.branch, month: pillars.month.branch,
+      day: pillars.day.branch, hour: pillars.hour.branch,
+    })) {
+      if (branch === target) positions.push(key);
+    }
+  }
+  return { name: "寡宿", found: positions.length > 0, positions, basedOn: "年支查寡宿", meaning: "独立、清静", strength: positions.length > 0 ? "弱" : "弱", caution: "不代表孤独终老" };
+}
+
 export function analyzeSymbolicStars(
   pillars: FourPillars,
 ): { stars: SymbolicStar[]; step: CalculationStep } {
   const stars = [
     findPeachBlossom(pillars),
+    findXianChi(pillars),
     findTravelHorse(pillars),
     findCanopyStar(pillars),
     findNobleStar(pillars),
@@ -316,6 +513,16 @@ export function analyzeSymbolicStars(
     findYangBlade(pillars),
     findLuStar(pillars),
     findVoidness(pillars),
+    findGeneralStar(pillars),
+    findTaiJiNoble(pillars),
+    findNationalSeal(pillars),
+    findFuStar(pillars),
+    findTianDe(pillars),
+    findYueDe(pillars),
+    findHongLuan(pillars),
+    findTianXi(pillars),
+    findGuChen(pillars),
+    findGuaSu(pillars),
   ];
 
   return {
