@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { DISCLAIMER } from "@/lib/fortune/shared/constants";
 import { toErrorResponse } from "@/lib/fortune/shared/errors";
-import type { FortuneSuccessResponse } from "@/lib/fortune/shared/types";
+import type {
+  AiStatusPayload,
+  FortuneSuccessResponse,
+} from "@/lib/fortune/shared/types";
 
 export function successResponse<TInput, TResult>(
   type: FortuneSuccessResponse<TInput, TResult>["type"],
@@ -10,6 +13,7 @@ export function successResponse<TInput, TResult>(
   calculation_steps: FortuneSuccessResponse<TInput, TResult>["calculation_steps"],
   ai_report: FortuneSuccessResponse<TInput, TResult>["ai_report"],
   warnings: string[] = [],
+  ai_status?: AiStatusPayload,
 ): NextResponse {
   const body: FortuneSuccessResponse<TInput, TResult> = {
     success: true,
@@ -18,6 +22,7 @@ export function successResponse<TInput, TResult>(
     algorithm_result,
     calculation_steps,
     ai_report,
+    ai_status,
     warnings,
     disclaimer: DISCLAIMER,
   };

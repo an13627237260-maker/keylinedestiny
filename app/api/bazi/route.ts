@@ -16,6 +16,7 @@ export async function POST(request: Request) {
       algorithm_result,
       input.focusArea,
       warnings,
+      calculation_steps,
     );
 
     try {
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
           inputData: JSON.stringify(input),
           algorithmResult: JSON.stringify(algorithm_result),
           calculationSteps: JSON.stringify(calculation_steps),
-          aiReport: JSON.stringify(ai.report),
+          aiReport: JSON.stringify({ report: ai.report, ai_status: ai.ai_status }),
           warnings: JSON.stringify(warnings),
         },
       });
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       calculation_steps,
       ai.text,
       warnings,
+      ai.ai_status,
     );
   } catch (error) {
     return errorResponse(error);

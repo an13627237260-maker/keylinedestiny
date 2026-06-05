@@ -11,7 +11,7 @@ export function CalculationStepsPanel({
   steps: CalculationStep[];
 }) {
   return (
-    <Accordion.Root type="multiple" className="space-y-2">
+    <Accordion.Root type="multiple" className="space-y-2" defaultValue={[]}>
       {steps.map((step, i) => (
         <Accordion.Item
           key={`${step.step}-${i}`}

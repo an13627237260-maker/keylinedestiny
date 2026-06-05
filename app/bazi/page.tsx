@@ -4,19 +4,23 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { PageShell } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
-import {
-  CalculationStepsPanel,
-  DisclaimerBanner,
-} from "@/components/fortune/calculation-steps";
-import { FiveElementsChart } from "@/components/bazi/five-elements-chart";
+import { DisclaimerBanner } from "@/components/fortune/calculation-steps";
+import { BaziResultPanels } from "@/components/bazi/bazi-result-panels";
 import { DISCLAIMER } from "@/lib/fortune/shared/constants";
+import type { BaziAlgorithmResult } from "@/lib/fortune/bazi";
+import type { AiStatusPayload, CalculationStep } from "@/lib/fortune/shared/types";
 
 export default function BaziPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = useState<{
+    algorithm_result: BaziAlgorithmResult;
+    calculation_steps: CalculationStep[];
+    ai_report: string;
+    ai_status?: AiStatusPayload;
+    input?: { focusArea?: string };
+  } | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,8 +64,6 @@ export default function BaziPage() {
     }
   }
 
-  const algo = result?.algorithm_result as Record<string, unknown> | undefined;
-
   return (
     <PageShell>
       <h1 className="mb-6 text-2xl font-bold text-violet-200">生辰八字测算</h1>
@@ -77,7 +79,7 @@ export default function BaziPage() {
           <Select name="gender" defaultValue="unknown">
             <option value="male">男</option>
             <option value="female">女</option>
-            <option value="unknown">未知</option>
+            <option value="unknown">未说明</option>
           </Select>
         </div>
         <div>
@@ -102,7 +104,7 @@ export default function BaziPage() {
         </div>
         <div>
           <Label>关注方向</Label>
-          <Select name="focusArea" defaultValue="overall">
+          <Select name="focusArea" defaultValue="study">
             <option value="overall">综合</option>
             <option value="love">感情</option>
             <option value="career">事业</option>
@@ -113,7 +115,7 @@ export default function BaziPage() {
         </div>
         <div>
           <Label>流年（可选）</Label>
-          <Input name="targetYear" type="number" placeholder="2026" />
+          <Input name="targetYear" type="number" placeholder="2026" defaultValue="2026" />
         </div>
         <div>
           <Label>换日规则</Label>
@@ -135,63 +137,19 @@ export default function BaziPage() {
 
       {error && <p className="mt-4 text-red-400">{error}</p>}
 
-      {algo && (
+      {result && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-8 space-y-6"
+          className="mt-8"
         >
-          <Card>
-            <CardHeader>
-              <CardTitle>四柱</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-4 gap-2 text-center text-lg">
-              {Object.entries(
-                (algo.pillarStrings as Record<string, string>) ?? {},
-              ).map(([k, v]) => (
-                <div key={k} className="rounded bg-violet-500/10 p-3">
-                  <div className="text-xs text-zinc-500">{k}</div>
-                  <div className="font-bold text-violet-200">{v}</div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>五行分布</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FiveElementsChart
-                percentages={
-                  (algo.fiveElements as { percentages: Record<string, number> })
-                    ?.percentages ?? {}
-                }
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>AI 报告</CardTitle>
-            </CardHeader>
-            <CardContent className="whitespace-pre-wrap text-sm text-zinc-300">
-              {String(result?.ai_report ?? "")}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>计算步骤</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CalculationStepsPanel
-                steps={
-                  (result?.calculation_steps as never[]) ?? []
-                }
-              />
-            </CardContent>
-          </Card>
+          <BaziResultPanels
+            algo={result.algorithm_result}
+            aiReport={result.ai_report}
+            aiStatus={result.ai_status}
+            calculationSteps={result.calculation_steps}
+            focusArea={result.input?.focusArea}
+          />
         </motion.div>
       )}
     </PageShell>

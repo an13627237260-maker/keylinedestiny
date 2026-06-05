@@ -11,6 +11,14 @@ export interface CalculationStep {
   notes: string[];
 }
 
+export interface AiStatusPayload {
+  provider: "openai" | "fallback";
+  reason: string;
+  model?: string;
+  consistency_passed: boolean;
+  display_label?: string;
+}
+
 export interface FortuneSuccessResponse<TInput, TResult> {
   success: true;
   type: FortuneType;
@@ -18,6 +26,7 @@ export interface FortuneSuccessResponse<TInput, TResult> {
   algorithm_result: TResult;
   calculation_steps: CalculationStep[];
   ai_report: string | Record<string, unknown>;
+  ai_status?: AiStatusPayload;
   warnings: string[];
   disclaimer: string;
 }

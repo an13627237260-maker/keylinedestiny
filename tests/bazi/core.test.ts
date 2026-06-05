@@ -27,6 +27,7 @@ import { analyzeBranchRelations } from "@/lib/fortune/bazi/branchRelations";
 import { calculateLuckCycle } from "@/lib/fortune/bazi/luckCycle";
 import { analyzeYearlyLuck } from "@/lib/fortune/bazi/yearlyLuck";
 import { computeFourPillars } from "@/lib/fortune/bazi/pillars";
+import { computeBazi } from "@/lib/fortune/bazi";
 import { drawTarotReading } from "@/lib/fortune/tarot";
 import { TAROT_DECK } from "@/lib/fortune/tarot/cards";
 import { getZodiacSign } from "@/lib/fortune/zodiac";
@@ -34,8 +35,8 @@ import { calculateFiveGrid } from "@/lib/fortune/name/analysis";
 import {
   containsForbiddenWords,
   validateAiReport,
-  buildFallbackBaziReport,
 } from "@/lib/ai/consistencyChecker";
+import { buildFallbackBaziReport } from "@/lib/ai/baziFallback";
 
 describe("天干地支基础映射", () => {
   it("十天干十二地支长度正确", () => {
@@ -283,11 +284,20 @@ describe("AI fallback", () => {
   });
 
   it("fallback 报告", () => {
+    const { algorithm_result } = computeBazi({
+      gender: "male",
+      birthDate: "1990-05-15",
+      birthTime: "14:30",
+      timezone: "Asia/Shanghai",
+      useTrueSolarTime: false,
+      focusArea: "overall",
+    });
     const fb = buildFallbackBaziReport(
-      { pillarStrings: { year: "甲子", month: "丙寅", day: "戊午", hour: "壬子" } },
+      algorithm_result as unknown as Record<string, unknown>,
       "overall",
     );
-    expect(fb.summary).toContain("甲子");
+    expect(fb.summary).toContain(algorithm_result.pillarStrings.year);
+    expect(fb.advice.length).toBeGreaterThanOrEqual(5);
     expect(containsForbiddenWords("一定")).toContain("一定");
   });
 });
