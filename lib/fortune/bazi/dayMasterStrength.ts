@@ -134,6 +134,7 @@ export function analyzeDayMasterStrength(
   for (const relation of [
     ...branchRelations.clashes,
     ...branchRelations.harms,
+    ...branchRelations.breaks,
     ...branchRelations.punishments,
   ]) {
     const touchesRoot = relation.branches.some(
@@ -142,7 +143,18 @@ export function analyzeDayMasterStrength(
     if (!touchesRoot) continue;
     const important =
       relation.pillars.includes("month") || relation.pillars.includes("day");
-    const delta = relation.type === "六冲" ? (important ? -7 : -4) : important ? -4 : -2;
+    const delta =
+      relation.type === "六冲"
+        ? important
+          ? -7
+          : -4
+        : relation.type === "破"
+          ? important
+            ? -3
+            : -1.5
+          : important
+            ? -4
+            : -2;
     score += delta;
     weakeningFactors.push(`${relation.description}影响日主根气`);
     reasoning.push(`${relation.description}涉及${relation.affectedArea.join("、")}，对根气按${Math.abs(delta)}分级扣分。`);

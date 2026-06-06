@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { computeBazi } from "@/lib/fortune/bazi";
 import { analyzeBranchRelations } from "@/lib/fortune/bazi/branchRelations";
 import { getSexagenary } from "@/lib/fortune/bazi/ganzhi";
+import { generateBaziReport } from "@/lib/fortune/report/baziReport";
+import { runBaziRules } from "@/lib/fortune/rules/baziRules";
 import type { EarthlyBranch } from "@/lib/fortune/bazi/constants";
 import type { FourPillars } from "@/lib/fortune/bazi/pillars";
 
@@ -88,5 +91,47 @@ describe("branchRelations 三合与三会", () => {
     const relation = analysis.meetings.find((m) => m.description.includes("寅卯半会木势倾向"));
     expect(relation?.confidence).toBe(55);
     expect(analysis.meetings.some((m) => m.description.includes("三会木势成势"))).toBe(false);
+  });
+});
+
+describe("branchRelations 地支破", () => {
+  it("子酉同时出现，触发子酉破", () => {
+    const { analysis } = analyzeBranchRelations(pillars(["子", "酉", "丑", "寅"]));
+    expect(analysis.breaks.some((b) => b.type === "破" && b.description.includes("子酉破"))).toBe(true);
+  });
+
+  it("午卯同时出现，触发午卯破", () => {
+    const { analysis } = analyzeBranchRelations(pillars(["午", "卯", "丑", "寅"]));
+    expect(analysis.breaks.some((b) => b.description.includes("午卯破"))).toBe(true);
+  });
+
+  it("辰丑同时出现，触发辰丑破", () => {
+    const { analysis } = analyzeBranchRelations(pillars(["辰", "丑", "子", "寅"]));
+    expect(analysis.breaks.some((b) => b.description.includes("辰丑破"))).toBe(true);
+  });
+
+  it("单独一个子不触发破", () => {
+    const { analysis } = analyzeBranchRelations(pillars(["子", "丑", "寅", "卯"]));
+    expect(analysis.breaks.some((b) => b.branches.includes("子"))).toBe(false);
+  });
+
+  it("破进入 rule evidence 和 report evidence", () => {
+    const input = {
+      gender: "male" as const,
+      birthDate: "1984-02-02",
+      birthTime: "18:00",
+      timezone: "Asia/Shanghai",
+      useTrueSolarTime: false,
+      focusArea: "overall" as const,
+      targetYear: 2026,
+    };
+    const { algorithm_result } = computeBazi(input);
+    expect(algorithm_result.branchRelations.breaks.some((b) => b.description.includes("子酉破"))).toBe(true);
+    const rules = runBaziRules(algorithm_result, input.focusArea);
+    expect(rules.some((rule) => rule.evidence.some((e) => e.detail.includes("子酉破")))).toBe(true);
+    const report = generateBaziReport(algorithm_result, rules, input);
+    expect(
+      report.sections.some((section) => section.evidence?.some((e) => e.detail.includes("子酉破"))),
+    ).toBe(true);
   });
 });

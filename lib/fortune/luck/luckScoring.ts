@@ -2,7 +2,7 @@ import type { BaziAlgorithmResult } from "../bazi";
 import { DateTime } from "luxon";
 import { computeLocationLuckDelta } from "../location/regionElements";
 import { pillarToString } from "../bazi/ganzhi";
-import { getTenGod } from "../bazi/tenGods";
+import { getTenGod, type TenGod } from "../bazi/tenGods";
 import {
   inferEvidencePolarity,
   stableEvidenceId,
@@ -42,11 +42,14 @@ const TIMEZONE = "Asia/Shanghai";
 type SubCategory = Exclude<LuckCategory, "overall">;
 
 const SUB_CATEGORIES: SubCategory[] = [
+  "relationship",
   "love",
   "wealth",
   "career",
   "study",
   "social",
+  "health",
+  "family",
 ];
 
 type ScoreBreakdown = LuckScore["scoreBreakdown"];
@@ -195,17 +198,23 @@ function fixedYearMonth(d: Date): { year: number; month: number } {
 
 export function getCategoryWeights(focusArea?: string): Record<SubCategory, number> {
   const w: Record<SubCategory, number> = {
-    love: 0.2,
-    wealth: 0.2,
-    career: 0.25,
-    study: 0.2,
-    social: 0.15,
+    relationship: 0.14,
+    love: 0.06,
+    wealth: 0.16,
+    career: 0.2,
+    study: 0.14,
+    social: 0.12,
+    health: 0.1,
+    family: 0.08,
   };
   const boostMap: Record<string, SubCategory> = {
+    relationship: "relationship",
     love: "love",
     wealth: "wealth",
     career: "career",
     study: "study",
+    health: "health",
+    family: "family",
   };
   const key = focusArea ? boostMap[focusArea] : undefined;
   if (!key) return w;
@@ -223,11 +232,12 @@ export function getCategoryWeights(focusArea?: string): Record<SubCategory, numb
 function weekdayCategoryWeight(dayOfWeek: number, cat: SubCategory): number {
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   if (isWeekend) {
-    if (cat === "love" || cat === "social") return 1.15;
+    if (cat === "relationship" || cat === "love" || cat === "social" || cat === "family") return 1.15;
     if (cat === "career" || cat === "study") return 0.9;
+    if (cat === "health") return 1.05;
   } else {
-    if (cat === "career" || cat === "study") return 1.1;
-    if (cat === "love" || cat === "social") return 0.95;
+    if (cat === "career" || cat === "study" || cat === "wealth") return 1.1;
+    if (cat === "relationship" || cat === "love" || cat === "social") return 0.95;
   }
   return 1;
 }
@@ -295,41 +305,64 @@ function categorySignalFromTenGod(
 
   if (god === "正财" || god === "偏财") {
     if (category === "wealth") d += dmStrength === "weak" ? -4 : 5;
+    if (category === "family") d += 1;
   }
   if (god === "正官" || god === "七杀") {
     if (category === "career") {
       d += hasSeal && dmStrength !== "weak" ? 5 : dmStrength === "weak" ? -4 : 3;
     }
+    if (category === "health" && dmStrength === "weak") d -= 2;
+  }
+  if (
+    (category === "relationship" || category === "love") &&
+    bazi.spousePalace?.spouseStar.stars.includes(god as TenGod)
+  ) {
+    d += dmStrength === "weak" ? 2 : 4;
   }
   if (god === "正印" || god === "偏印") {
     if (category === "study") d += 5;
     if (category === "social") d += 1;
+    if (category === "family") d += 3;
+    if (category === "health") d += 2;
   }
   if (god === "食神" || god === "伤官") {
     if (category === "social") d += 4;
     if (category === "study") d += 3;
     if (category === "love") d += 2;
+    if (category === "relationship") d += 2;
   }
   if (god === "比肩" || god === "劫财") {
     if (category === "social") d += 2;
     if (category === "wealth") d -= 3;
+    if (category === "family") d -= 1;
   }
   return d;
 }
 
 function relationDelta(type: string, category: SubCategory, natal = ""): number {
   if (type === "六合") {
-    if (category === "love") return 5;
+    if (category === "relationship" || category === "love") return 5;
     if (category === "social") return 3;
+    if (category === "family") return 1;
   }
   if (type === "冲") {
-    if (category === "love") return -6;
+    if (category === "relationship" || category === "love") return -6;
     if (category === "social") return -3;
+    if (category === "health") return -3;
+    if (category === "family" && (natal.includes("年") || natal.includes("月"))) return -5;
     if (natal.includes("月") && category === "career") return -5;
     if (natal.includes("月") && category === "study") return -3;
   }
-  if (type === "害" && category === "social") return -2;
+  if (type === "害" || type === "破") {
+    if (category === "relationship" || category === "love") return -3;
+    if (category === "social" || category === "family" || category === "health") return -2;
+  }
+  if (type.includes("刑")) {
+    if (category === "relationship" || category === "love") return -3;
+    if (category === "health" || category === "family") return -2;
+  }
   if ((type === "三合" || type === "三会") && category === "social") return 2;
+  if ((type === "三合" || type === "三会") && category === "family") return 1;
   return 0;
 }
 
@@ -591,8 +624,12 @@ function scoreYearCategory(
 
   let monthDelta = 0;
   const monthScores: { month: number; pillar: string; delta: number }[] = [];
+  const solarMonths = bazi.monthlyLuck?.length === 12 ? bazi.monthlyLuck : undefined;
   for (let mi = 1; mi <= 12; mi++) {
-    const mp = getMonthPillarForCalendarMonth(y, mi);
+    const solarMonth = solarMonths?.[mi - 1];
+    const mp = solarMonth
+      ? { stem: solarMonth.monthStem, branch: solarMonth.monthBranch, index: 0 }
+      : getMonthPillarForCalendarMonth(y, mi);
     const god = getTenGod(bazi.pillars.day.stem, mp.stem);
     const d = categorySignalFromTenGod(
       god,
@@ -601,7 +638,7 @@ function scoreYearCategory(
       bazi,
     );
     monthDelta += d;
-    monthScores.push({ month: mi, pillar: pillarToString(mp), delta: d });
+    monthScores.push({ month: mi, pillar: solarMonth?.pillar ?? pillarToString(mp), delta: d });
   }
   const monthImpact = (monthDelta / 12) * weights.month;
   const relationImpact =

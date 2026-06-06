@@ -32,6 +32,10 @@ import { analyzeNayin } from "./nayin";
 import { analyzePatterns } from "./patterns";
 import { analyzeUsefulGods } from "./usefulGods";
 import { analyzeMonthlyLuck } from "./monthlyLuck";
+import { evaluateClimateAdjustment } from "./climateAdjustment";
+import { analyzeSpousePalace } from "./spousePalace";
+import { analyzeHealthTendency } from "./healthTendency";
+import { analyzeDomainAnalyses } from "./domainAnalyses";
 
 export interface BaziAlgorithmResult {
   pillars: ReturnType<typeof computeFourPillars>["pillars"];
@@ -52,6 +56,12 @@ export interface BaziAlgorithmResult {
   nayin: ReturnType<typeof analyzeNayin>["nayin"];
   patternTendencies: ReturnType<typeof analyzePatterns>["tendencies"];
   usefulGods: ReturnType<typeof analyzeUsefulGods>["analysis"];
+  climate: ReturnType<typeof evaluateClimateAdjustment>;
+  spousePalace: ReturnType<typeof analyzeSpousePalace>;
+  healthTendency: ReturnType<typeof analyzeHealthTendency>;
+  careerAnalysis: ReturnType<typeof analyzeDomainAnalyses>["career"];
+  wealthAnalysis: ReturnType<typeof analyzeDomainAnalyses>["wealth"];
+  familyAnalysis: ReturnType<typeof analyzeDomainAnalyses>["family"];
   luckCycle: ReturnType<typeof calculateLuckCycle>["analysis"];
   yearlyLuck?: ReturnType<typeof analyzeYearlyLuck>["analysis"];
   monthlyLuck?: ReturnType<typeof analyzeMonthlyLuck>["months"];
@@ -228,6 +238,23 @@ export function computeBazi(
   const branchRelationsResult = analyzeBranchRelations(pillars);
   steps.push(branchRelationsResult.step);
 
+  const climateAnalysis = evaluateClimateAdjustment({
+    pillars,
+    elementDistribution: fiveElementsResult.analysis,
+    dayMasterStrength: dayMasterResult.analysis,
+  });
+  steps.push({
+    step: "climate_adjustment",
+    title: "调候分析",
+    input: {
+      dayMaster: pillars.day.stem,
+      monthBranch: pillars.month.branch,
+    },
+    method: "依据月令寒热燥湿、日主五行与五行分布判断调候倾向",
+    result: climateAnalysis as unknown as Record<string, unknown>,
+    notes: [...climateAnalysis.reasoning, climateAnalysis.caution],
+  });
+
   const symbolicStarsResult = analyzeSymbolicStars(pillars);
   steps.push(symbolicStarsResult.step);
 
@@ -272,6 +299,74 @@ export function computeBazi(
   steps.push(monthlyResult.step);
   monthlyLuckAnalysis = monthlyResult.months;
 
+  const currentLuckForTarget = luckCycleResult.analysis.cycles.find(
+    (cycle) => targetYear >= cycle.startYear && targetYear <= cycle.endYear,
+  );
+
+  const spousePalaceAnalysis = analyzeSpousePalace({
+    input,
+    pillars,
+    tenGods: tenGodsResult.analysis,
+    branchRelations: branchRelationsResult.analysis,
+    currentLuck: currentLuckForTarget ?? luckCycleResult.analysis.currentCycle,
+    annualLuck: yearlyLuckAnalysis,
+  });
+  steps.push({
+    step: "spouse_palace",
+    title: "夫妻宫与感情关系",
+    input: {
+      gender: input.gender,
+      spousePalace: pillars.day.branch,
+      targetYear,
+    },
+    method: "以日支为夫妻宫；女命官杀、男命财星为伴侣星；结合合冲刑害破与大运流年引动",
+    result: spousePalaceAnalysis as unknown as Record<string, unknown>,
+    notes: spousePalaceAnalysis.cautions,
+  });
+
+  const healthTendency = analyzeHealthTendency({
+    pillars,
+    elementDistribution: fiveElementsResult.analysis,
+    climate: climateAnalysis,
+    branchRelations: branchRelationsResult.analysis,
+  });
+  steps.push({
+    step: "health_tendency",
+    title: "健康倾向",
+    input: {
+      strongestElement: fiveElementsResult.analysis.strongestElement,
+      climateType: climateAnalysis.climateType,
+    },
+    method: "依据五行偏旺偏弱、调候寒热燥湿与冲刑害破输出命理象意健康倾向",
+    result: healthTendency as unknown as Record<string, unknown>,
+    notes: [healthTendency.disclaimer],
+  });
+
+  const domainAnalyses = analyzeDomainAnalyses({
+    pillars,
+    tenGods: tenGodsResult.analysis,
+    dayMasterStrength: dayMasterResult.analysis,
+    fiveElements: fiveElementsResult.analysis,
+    branchRelations: branchRelationsResult.analysis,
+    currentLuck: currentLuckForTarget ?? luckCycleResult.analysis.currentCycle,
+    annualLuck: yearlyLuckAnalysis,
+  });
+  steps.push({
+    step: "domain_analyses",
+    title: "事业财运家庭分析",
+    input: {
+      targetYear,
+      dayMasterStrength: dayMasterResult.analysis.strengthLevel,
+    },
+    method: "分别以官杀印食伤财星、财星透根与年/月柱家庭宫位建立证据链",
+    result: domainAnalyses as unknown as Record<string, unknown>,
+    notes: [
+      domainAnalyses.career.caution,
+      domainAnalyses.wealth.caution,
+      domainAnalyses.family.caution,
+    ],
+  });
+
   const locationInfluence: LocationInfluence = {
     resolved,
     originalDateTime: originalDateTimeIso,
@@ -302,6 +397,12 @@ export function computeBazi(
     symbolicStars: symbolicStarsResult.stars,
     twelveGrowthStages: growthResult.stages,
     nayin: nayinResult.nayin,
+    climate: climateAnalysis,
+    spousePalace: spousePalaceAnalysis,
+    healthTendency,
+    careerAnalysis: domainAnalyses.career,
+    wealthAnalysis: domainAnalyses.wealth,
+    familyAnalysis: domainAnalyses.family,
     luckCycle: luckCycleResult.analysis,
     yearlyLuck: yearlyLuckAnalysis,
     monthlyLuck: monthlyLuckAnalysis,
@@ -333,6 +434,12 @@ export function computeBazi(
     nayin: nayinResult.nayin,
     patternTendencies: patternsResult.tendencies,
     usefulGods: usefulGodsResult.analysis,
+    climate: climateAnalysis,
+    spousePalace: spousePalaceAnalysis,
+    healthTendency,
+    careerAnalysis: domainAnalyses.career,
+    wealthAnalysis: domainAnalyses.wealth,
+    familyAnalysis: domainAnalyses.family,
     luckCycle: luckCycleResult.analysis,
     yearlyLuck: yearlyLuckAnalysis,
     monthlyLuck: monthlyLuckAnalysis,

@@ -19,13 +19,30 @@ const SAMPLE_INPUT = {
 };
 
 function getBazi(
-  focusArea: "overall" | "love" | "wealth" | "career" | "study" | "health" = "overall",
+  focusArea:
+    | "overall"
+    | "relationship"
+    | "love"
+    | "wealth"
+    | "career"
+    | "study"
+    | "health"
+    | "family" = "overall",
 ) {
   const { algorithm_result } = computeBazi({ ...SAMPLE_INPUT, focusArea });
   return algorithm_result;
 }
 
-const CATEGORIES = ["love", "wealth", "career", "study", "social"] as const;
+const CATEGORIES = [
+  "relationship",
+  "love",
+  "wealth",
+  "career",
+  "study",
+  "social",
+  "health",
+  "family",
+] as const;
 const PERIODS: LuckPeriod[] = ["day", "week", "month", "year"];
 const FORBIDDEN = ["一定", "必然", "注定", "包发财", "必脱单"];
 
@@ -126,8 +143,7 @@ describe("运势评分 luckScoring", () => {
     const study = getCategoryWeights("study");
     expect(study.study).toBe(0.35);
     expect(study.study).toBeGreaterThan(normal.study);
-    const sum =
-      study.love + study.wealth + study.career + study.study + study.social;
+    const sum = CATEGORIES.reduce((acc, cat) => acc + study[cat], 0);
     expect(sum).toBeCloseTo(1, 5);
   });
 

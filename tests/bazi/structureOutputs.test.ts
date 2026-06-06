@@ -85,4 +85,18 @@ describe("bazi structure outputs", () => {
       expect(star.caution).toBeTruthy();
     }
   });
+
+  it("新增调候、夫妻宫、健康与领域分析均有 evidence", () => {
+    expect(algorithm_result.climate.evidence.length).toBeGreaterThan(0);
+    expect(algorithm_result.spousePalace.evidence.length).toBeGreaterThan(0);
+    expect(algorithm_result.healthTendency.evidence.length).toBeGreaterThan(0);
+    expect(algorithm_result.careerAnalysis.evidence.length).toBeGreaterThan(0);
+    expect(algorithm_result.wealthAnalysis.evidence.length).toBeGreaterThan(0);
+    expect(algorithm_result.familyAnalysis.evidence.length).toBeGreaterThan(0);
+
+    expect(calculation_steps.some((step) => step.step === "climate_adjustment")).toBe(true);
+    expect(calculation_steps.some((step) => step.step === "spouse_palace")).toBe(true);
+    expect(calculation_steps.some((step) => step.step === "health_tendency")).toBe(true);
+    expect(calculation_steps.some((step) => step.step === "domain_analyses")).toBe(true);
+  });
 });

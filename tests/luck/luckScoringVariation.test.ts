@@ -11,7 +11,16 @@ const INPUT = {
   focusArea: "overall" as const,
 };
 
-const CATEGORIES = ["love", "wealth", "career", "study", "social"] as const;
+const CATEGORIES = [
+  "relationship",
+  "love",
+  "wealth",
+  "career",
+  "study",
+  "social",
+  "health",
+  "family",
+] as const;
 
 function getBazi() {
   return computeBazi(INPUT).algorithm_result;

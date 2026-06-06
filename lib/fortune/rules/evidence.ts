@@ -12,6 +12,10 @@ export interface EvidenceItem {
     | "nayin"
     | "pattern"
     | "useful_god"
+    | "climate"
+    | "spouse_palace"
+    | "health_tendency"
+    | "domain_analysis"
     | "luck_cycle"
     | "year_transit"
     | "month_transit"
@@ -22,10 +26,12 @@ export interface EvidenceItem {
     | "overall"
     | "personality"
     | "love"
+    | "relationship"
     | "wealth"
     | "career"
     | "study"
     | "health"
+    | "family"
     | "social"
     | "timing"
     | "advice";
@@ -58,10 +64,12 @@ export function ruleCategoryToEvidenceCategory(category: string): EvidenceCatego
   if (
     category === "personality" ||
     category === "love" ||
+    category === "relationship" ||
     category === "wealth" ||
     category === "career" ||
     category === "study" ||
     category === "health" ||
+    category === "family" ||
     category === "advice" ||
     category === "social" ||
     category === "overall"
@@ -77,6 +85,9 @@ export function inferEvidenceSource(text: string, tags: string[] = []): Evidence
   if (haystack.includes("流月")) return "month_transit";
   if (haystack.includes("流年")) return "year_transit";
   if (haystack.includes("大运")) return "luck_cycle";
+  if (haystack.includes("夫妻宫") || haystack.includes("伴侣星") || haystack.includes("感情关系")) return "spouse_palace";
+  if (haystack.includes("健康") || haystack.includes("睡眠") || haystack.includes("脾胃") || haystack.includes("寒湿")) return "health_tendency";
+  if (haystack.includes("调候") || haystack.includes("寒") || haystack.includes("燥") || haystack.includes("湿") || haystack.includes("热")) return "climate";
   if (haystack.includes("真太阳时") || haystack.includes("地域") || haystack.includes("经度")) return "location";
   if (haystack.includes("喜用") || haystack.includes("忌神")) return "useful_god";
   if (haystack.includes("格局")) return "pattern";

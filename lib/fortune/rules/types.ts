@@ -4,10 +4,12 @@ import type { EvidenceItem } from "./evidence";
 export type RuleCategory =
   | "personality"
   | "love"
+  | "relationship"
   | "career"
   | "wealth"
   | "study"
   | "health"
+  | "family"
   | "yearly"
   | "advice";
 

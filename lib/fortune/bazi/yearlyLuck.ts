@@ -68,11 +68,13 @@ export function analyzeYearlyLuck(
 
   const focusAreaHints: Record<string, string> = {
     overall: `流年${yearPillar}，十神${yearStemTenGod}，可综合观察生活各面向的变化趋势`,
+    relationship: "关注夫妻宫、伴侣星、合冲刑害破与流年对感情关系的引动",
     love: "关注桃花、合冲与流年十神对感情话题的可能影响",
     career: "关注官杀、印星与流年地支冲动对事业节奏的可能影响",
     wealth: "关注财星十神与五行补耗趋势",
     study: "关注印星、文昌等辅助标签",
     health: "关注五行平衡与压力标签，不作医疗判断",
+    family: "关注年柱、月柱、印星与流年对家庭责任的引动",
   };
 
   const analysis: YearlyLuckAnalysis = {

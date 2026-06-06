@@ -6,11 +6,13 @@ export const STRENGTH_LEVEL_LABELS: Record<string, string> = {
 
 export const FOCUS_AREA_LABELS: Record<string, string> = {
   overall: "综合",
-  love: "感情",
+  love: "感情关系",
+  relationship: "感情关系",
   career: "事业",
   wealth: "财运",
   study: "学业",
   health: "生活方式",
+  family: "家庭责任 / 家庭关系",
 };
 
 export const GENDER_LABELS: Record<string, string> = {

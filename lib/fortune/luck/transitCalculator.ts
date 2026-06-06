@@ -88,6 +88,10 @@ const LIU_HAI: Array<[EarthlyBranch, EarthlyBranch]> = [
   ["子", "未"], ["丑", "午"], ["寅", "巳"], ["卯", "辰"], ["申", "亥"], ["酉", "戌"],
 ];
 
+const BRANCH_BREAKS: Array<[EarthlyBranch, EarthlyBranch]> = [
+  ["子", "酉"], ["午", "卯"], ["辰", "丑"], ["未", "戌"], ["寅", "亥"], ["巳", "申"],
+];
+
 function branchesPair(
   a: EarthlyBranch,
   b: EarthlyBranch,
@@ -173,6 +177,14 @@ function analyzeTransitRelations(
         description: `${transitLabel}害${key}支${nb}，细节上宜多确认`,
       });
     }
+    if (branchesPair(transitBranch, nb, BRANCH_BREAKS)) {
+      out.push({
+        type: "破",
+        transit: transitLabel,
+        natal: `${key}支${nb}`,
+        description: `${transitLabel}破${key}支${nb}，计划与细节容易反复，宜预留弹性`,
+      });
+    }
   }
 
   const virtual = {
@@ -191,6 +203,14 @@ function analyzeTransitRelations(
     });
   }
   for (const c of rel.analysis.meetings) {
+    out.push({
+      type: c.type,
+      transit: transitLabel,
+      natal: c.branches.join(""),
+      description: c.description,
+    });
+  }
+  for (const c of rel.analysis.breaks) {
     out.push({
       type: c.type,
       transit: transitLabel,
@@ -236,11 +256,14 @@ function computeCategorySignals(
   const dm = bazi.pillars.day.stem;
   const dmStrength = bazi.dayMasterStrength.strengthLevel;
   const signals: Record<SubCategory, number> = {
+    relationship: 0,
     love: 0,
     wealth: 0,
     career: 0,
     study: 0,
     social: 0,
+    health: 0,
+    family: 0,
   };
 
   const dayGod = ctx.day.stemTenGod;
@@ -255,6 +278,7 @@ function computeCategorySignals(
       signals.wealth += 4 * scale;
       if (dmStrength === "weak") signals.wealth -= 3 * scale;
       else signals.wealth += 2 * scale;
+      signals.family += 1 * scale;
     }
     if (g === "正官" || g === "七杀") {
       const hasSeal =
@@ -262,20 +286,29 @@ function computeCategorySignals(
       if (hasSeal && dmStrength !== "weak") signals.career += 5 * scale;
       else if (dmStrength === "weak") {
         signals.career -= 4 * scale;
+        signals.health -= 2 * scale;
       } else signals.career += 3 * scale;
+    }
+    if (bazi.spousePalace?.spouseStar.stars.includes(g)) {
+      signals.relationship += (dmStrength === "weak" ? 2 : 4) * scale;
+      signals.love += (dmStrength === "weak" ? 2 : 4) * scale;
     }
     if (g === "正印" || g === "偏印") {
       signals.study += 5 * scale;
       signals.social += 1 * scale;
+      signals.family += 3 * scale;
+      signals.health += 1 * scale;
     }
     if (g === "食神" || g === "伤官") {
       signals.social += 3 * scale;
       signals.study += 2 * scale;
+      signals.relationship += 2 * scale;
       signals.love += 2 * scale;
     }
     if (g === "比肩" || g === "劫财") {
       signals.social += 2 * scale;
       signals.wealth -= 3 * scale;
+      signals.family -= 1 * scale;
     }
   };
 
@@ -286,23 +319,42 @@ function computeCategorySignals(
 
   for (const r of ctx.relations.dayRelations) {
     if (r.type === "六合") {
+      signals.relationship += 5;
       signals.love += 5;
       signals.social += 3;
     }
     if (r.type === "冲") {
+      signals.relationship -= 6;
       signals.love -= 6;
       signals.social -= 3;
+      signals.health -= 3;
       if (r.natal.includes("月")) {
         signals.career -= 5;
         signals.study -= 3;
+        signals.family -= 2;
       }
+      if (r.natal.includes("年")) signals.family -= 3;
     }
-    if (r.type === "害") signals.social -= 2;
+    if (r.type === "害" || r.type === "破") {
+      signals.relationship -= 3;
+      signals.love -= 3;
+      signals.social -= 2;
+      signals.family -= 2;
+      signals.health -= 1;
+    }
+    if (r.type.includes("刑")) {
+      signals.relationship -= 3;
+      signals.love -= 3;
+      signals.health -= 2;
+    }
   }
 
   for (const r of ctx.relations.monthRelations) {
     if (r.type === "冲" && r.natal.includes("月")) signals.career -= 4;
     if (r.type === "六合") signals.career += 2;
+    if ((r.type === "冲" || r.type === "破" || r.type === "害") && r.natal.includes("月")) {
+      signals.family -= 2;
+    }
   }
 
   const useful = bazi.usefulGods?.usefulElementTendency ?? [];
@@ -312,18 +364,29 @@ function computeCategorySignals(
       signals.wealth += 2;
       signals.career += 2;
       signals.study += 2;
+      signals.health += 1;
     }
   }
   for (const el of avoid) {
     if (ctx.elementImpact[el] > 1) {
       signals.wealth -= 2;
       signals.career -= 2;
+      signals.health -= 1;
     }
   }
 
   if (bazi.symbolicStars.some((s) => s.name === "桃花" && s.found)) {
+    signals.relationship += 3;
     signals.love += 3;
     signals.social += 2;
+  }
+
+  if (bazi.spousePalace?.isClashed) {
+    signals.relationship -= 2;
+    signals.love -= 2;
+  }
+  if (bazi.healthTendency?.tendencies.length) {
+    signals.health -= Math.min(4, bazi.healthTendency.tendencies.length);
   }
 
   return signals;

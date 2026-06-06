@@ -18,7 +18,15 @@ export interface SavedBaziFormInput {
   longitude?: number;
   timezone: string;
   useTrueSolarTime: boolean;
-  focusArea: "overall" | "love" | "career" | "wealth" | "study" | "health";
+  focusArea:
+    | "overall"
+    | "relationship"
+    | "love"
+    | "career"
+    | "wealth"
+    | "study"
+    | "health"
+    | "family";
   targetYear?: number;
   dayBoundaryMode: "midnight" | "ziHour";
   useOnlineSolarTerms?: boolean;
@@ -122,10 +130,12 @@ function cleanGender(value: unknown): SavedBaziFormInput["gender"] {
 
 function cleanFocus(value: unknown): SavedBaziFormInput["focusArea"] {
   return value === "love" ||
+    value === "relationship" ||
     value === "career" ||
     value === "wealth" ||
     value === "study" ||
     value === "health" ||
+    value === "family" ||
     value === "overall"
     ? value
     : DEFAULT_INPUT.focusArea;

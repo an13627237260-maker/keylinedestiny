@@ -24,7 +24,8 @@ export function scoreToLevel(score: number): string {
 }
 
 const FORBIDDEN_WORDS = [
-  "一定", "必然", "注定", "包发财", "必脱单", "脱单", "复合", "正缘",
+  "一定", "必然", "注定", "百分百", "包发财", "必发财", "必脱单", "脱单", "必复合",
+  "复合", "必离婚", "必生病", "正缘", "包赚钱", "包上岸", "改命", "逆天改运",
   "必定遇到", "会发财", "投资必赚", "彩票中奖",
 ];
 
@@ -41,11 +42,14 @@ function tier(score: number): "high" | "mid" | "low" {
 }
 
 const CATEGORY_FOCUS: Record<SubCategory, string> = {
+  relationship: "感情关系与亲密互动",
   love: "感情互动与表达",
   wealth: "财务规划与资源流动",
   career: "工作推进与职场节奏",
   study: "学习吸收与知识整理",
   social: "人际联络与协作沟通",
+  health: "作息、压力与身心节奏",
+  family: "家庭责任与家庭关系",
 };
 
 function periodOpener(
@@ -94,6 +98,11 @@ function relationTone(evidence: EvidenceItem[]): string {
 
 function tierNarrative(category: SubCategory, t: "high" | "mid" | "low"): string {
   const map: Record<SubCategory, Record<string, string>> = {
+    relationship: {
+      high: "关系议题较容易被看见，适合用清楚表达和具体行动建立稳定感。",
+      mid: "感情关系整体平稳，宜把需求说具体，少用猜测替代沟通。",
+      low: "关系节奏可能更敏感，先稳定情绪与边界，再处理深层议题。",
+    },
     love: {
       high: "情感流动感较好，适合把话说清楚，也给彼此一点回应空间。",
       mid: "感情整体平稳，宜慢慢沟通、倾听需求，避免带着情绪下判断。",
@@ -118,6 +127,16 @@ function tierNarrative(category: SubCategory, t: "high" | "mid" | "low"): string
       high: "人际互动较顺，适合主动联系，倾听比说服更重要。",
       mid: "社交保持平常心即可，遇到分歧时留一点余地。",
       low: "人际可能略紧绷，放慢语速、减少评判，小误会宜早澄清。",
+    },
+    health: {
+      high: "身心节奏相对容易稳定，适合整理作息、恢复运动和减少过度消耗。",
+      mid: "健康倾向以维持为主，睡眠、饮食、运动保持规律比临时补救更有效。",
+      low: "压力或作息波动可能更明显，宜降低强度、保暖休息并观察身体反馈。",
+    },
+    family: {
+      high: "家庭责任处理较有秩序，适合协调分工、确认计划和修复沟通细节。",
+      mid: "家庭关系以稳定为主，宜把责任说清楚，避免把小事累积成压力。",
+      low: "家庭议题可能带来牵扯感，先确认事实和边界，再处理情绪。",
     },
   };
   return map[category][t];
@@ -195,7 +214,7 @@ export function buildLuckScoreText(
   }
   if (
     (input.transit.day.stemTenGod === "食神" || input.transit.day.stemTenGod === "伤官") &&
-    (input.category === "social" || input.category === "love")
+    (input.category === "social" || input.category === "love" || input.category === "relationship")
   ) {
     advice.push("表达前先倾听，语气宜柔和");
   }
@@ -207,11 +226,14 @@ export function buildLuckScoreText(
   }
 
   const fallbackAdvice: Record<SubCategory, string[][]> = {
+    relationship: [["说清需求", "多给回应", "确认边界"], ["慢慢沟通", "用行动代替猜测"], ["先稳情绪", "减少急切判断"]],
     love: [["多给对方回应", "表达前先倾听", "避免情绪化决定"], ["安排轻松相处", "用具体行动代替猜测"], ["先照顾情绪", "不宜急着下结论"]],
     wealth: [["整理预算", "检查固定支出"], ["大额消费多比较", "稳健优先"], ["暂缓高风险决定", "理清账目"]],
     career: [["推进手头任务", "整理优先级"], ["补齐细节", "沟通务实"], ["任务拆解", "避免硬碰硬"]],
     study: [["系统复习", "整理笔记"], ["固定学习时段", "基础再过一遍"], ["缩短单次时长", "任务拆小"]],
     social: [["主动联系", "倾听对方"], ["保持平常心", "留余地"], ["放慢节奏", "简单澄清误会"]],
+    health: [["整理作息", "轻运动恢复"], ["固定睡眠", "饮食规律"], ["降低强度", "观察身体反馈"]],
+    family: [["确认分工", "温和沟通"], ["把责任说清", "减少猜测"], ["先确认事实", "边界清楚"]],
   };
   const fb = fallbackAdvice[input.category][t === "high" ? 0 : t === "mid" ? 1 : 2];
   for (const a of fb) {

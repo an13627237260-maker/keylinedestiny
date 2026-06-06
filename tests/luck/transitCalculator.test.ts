@@ -40,11 +40,14 @@ describe("transitCalculator", () => {
 
   it("categorySignals 含全部分项", () => {
     const ctx = calculateTransitContext(bazi, new Date("2026-06-05"));
+    expect(ctx.categorySignals.relationship).toBeDefined();
     expect(ctx.categorySignals.love).toBeDefined();
     expect(ctx.categorySignals.wealth).toBeDefined();
     expect(ctx.categorySignals.career).toBeDefined();
     expect(ctx.categorySignals.study).toBeDefined();
     expect(ctx.categorySignals.social).toBeDefined();
+    expect(ctx.categorySignals.health).toBeDefined();
+    expect(ctx.categorySignals.family).toBeDefined();
   });
 
   it("同一日期重复计算一致", () => {

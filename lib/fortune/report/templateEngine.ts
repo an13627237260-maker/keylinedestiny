@@ -21,12 +21,14 @@ export function buildReport(
   summary: string,
   sections: ReportSection[],
   advice: string[],
+  adviceEvidenceIds: string[] = [],
 ): FortuneReport {
   return {
     title,
     summary,
     sections,
     advice,
+    adviceEvidenceIds,
     disclaimer: DISCLAIMER,
   };
 }

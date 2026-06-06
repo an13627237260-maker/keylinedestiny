@@ -9,6 +9,7 @@ export interface BranchRelation {
     | "三会"
     | "六冲"
     | "六害"
+    | "破"
     | "刑"
     | "刑势倾向"
     | "自刑";
@@ -24,6 +25,7 @@ export interface BranchRelationsAnalysis {
   meetings: BranchRelation[];
   clashes: BranchRelation[];
   harms: BranchRelation[];
+  breaks: BranchRelation[];
   punishments: BranchRelation[];
   interpretationTags: string[];
 }
@@ -67,6 +69,15 @@ const LIU_HAI: Array<[EarthlyBranch, EarthlyBranch]> = [
   ["卯", "辰"],
   ["申", "亥"],
   ["酉", "戌"],
+];
+
+export const BRANCH_BREAKS: Array<[EarthlyBranch, EarthlyBranch]> = [
+  ["子", "酉"],
+  ["午", "卯"],
+  ["辰", "丑"],
+  ["未", "戌"],
+  ["寅", "亥"],
+  ["巳", "申"],
 ];
 
 const SELF_PUNISHMENTS: EarthlyBranch[] = ["辰", "午", "酉", "亥"];
@@ -161,6 +172,7 @@ export function analyzeBranchRelations(
   const meetings: BranchRelation[] = [];
   const clashes: BranchRelation[] = [];
   const harms: BranchRelation[] = [];
+  const breaks: BranchRelation[] = [];
   const punishments: BranchRelation[] = [];
   const interpretationTags: string[] = [];
 
@@ -236,6 +248,21 @@ export function analyzeBranchRelations(
     }
   }
 
+  for (const pair of BRANCH_BREAKS) {
+    const keys = matchPair(entries, pair);
+    if (keys) {
+      breaks.push({
+        type: "破",
+        branches: pair,
+        pillars: keys,
+        description: `${pair.join("")}破，提示关系结构有破损、反复、细节不顺或计划被打断的倾向`,
+        confidence: 62,
+        affectedArea: affectedAreas(keys),
+      });
+      interpretationTags.push("地支破");
+    }
+  }
+
   const ziMao = matchPair(entries, ["子", "卯"]);
   if (ziMao) {
     punishments.push({
@@ -294,6 +321,7 @@ export function analyzeBranchRelations(
     meetings,
     clashes,
     harms,
+    breaks,
     punishments,
     interpretationTags,
   };
@@ -304,9 +332,12 @@ export function analyzeBranchRelations(
       step: "branch_relations",
       title: "地支合冲刑害",
       input: { branches },
-      method: "六合、三合/半合/拱合、三会/半会、六冲、六害、刑与自刑",
+      method: "六合、三合/半合/拱合、三会/半会、六冲、六害、破、刑与自刑",
       result: analysis as unknown as Record<string, unknown>,
-      notes: ["两支只输出倾向，不按三合局或三会成立处理；单个辰午酉亥不触发自刑。"],
+      notes: [
+        "两支只输出倾向，不按三合局或三会成立处理；单个辰午酉亥不触发自刑。",
+        "地支破只作为辅助关系，不单独决定婚姻、财运或健康结论。",
+      ],
     },
   };
 }

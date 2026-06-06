@@ -34,13 +34,36 @@ describe("evidence driven bazi report", () => {
     const { algorithm_result } = computeBazi(INPUT);
     const rules = runBaziRules(algorithm_result, INPUT.focusArea);
     const report = generateBaziReport(algorithm_result, rules, INPUT);
-    expect(report.sections.length).toBeGreaterThanOrEqual(12);
+    expect(report.sections.map((section) => section.title)).toEqual([
+      "命盘总览",
+      "四柱结构",
+      "日主强弱",
+      "五行分布",
+      "十神结构",
+      "调候分析",
+      "合冲刑害",
+      "夫妻宫与感情关系",
+      "事业方向",
+      "财运模式",
+      "家庭责任",
+      "健康倾向",
+      "当前大运",
+      "目标流年",
+      "流月 / 流日提示",
+      "风险点",
+      "行动建议",
+      "依据摘要",
+      "免责声明",
+    ]);
     for (const section of report.sections) {
       expect(section.content).toContain("结论：");
       expect(section.content).toContain("依据：");
       expect(section.content).toContain("影响：");
       expect(section.content).toContain("建议：");
       expect(section.evidence?.length).toBeGreaterThan(0);
+      expect(section.evidenceIds?.length).toBeGreaterThan(0);
+      expect(section.basis?.length).toBeGreaterThan(0);
+      expect(section.advice).toBeTruthy();
     }
   });
 
@@ -57,7 +80,7 @@ describe("evidence driven bazi report", () => {
   it("没有 rule evidence 时不生成无依据规则判断", () => {
     const { algorithm_result } = computeBazi(INPUT);
     const report = generateBaziReport(algorithm_result, [], INPUT);
-    const adviceSection = report.sections.find((section) => section.title === "具体建议");
+    const adviceSection = report.sections.find((section) => section.title === "行动建议");
     expect(adviceSection?.evidence?.length).toBeGreaterThan(0);
     expect(adviceSection?.content).not.toContain("这条规则不应输出");
   });

@@ -8,6 +8,7 @@ import {
   type EvidenceSource,
 } from "../rules/evidence";
 import { labelFocusArea, labelStrength } from "../shared/labels";
+import { DISCLAIMER } from "../shared/constants";
 import type { FortuneReport, ReportSection, RuleResult } from "../shared/reportTypes";
 import type { BaziInput } from "../shared/validation";
 import { buildReport, joinParagraphs } from "./templateEngine";
@@ -54,6 +55,8 @@ function makeSection(input: {
   advice: string;
 }): ReportSection | null {
   if (!input.evidence.length) return null;
+  const basis = input.evidence.slice(0, 6).map((item) => item.detail);
+  const evidenceIds = input.evidence.map((item) => item.id);
   return {
     title: input.title,
     content: joinParagraphs([
@@ -62,6 +65,10 @@ function makeSection(input: {
       `影响：${input.impact}`,
       `建议：${input.advice}`,
     ]),
+    conclusion: input.conclusion,
+    basis,
+    evidenceIds,
+    advice: input.advice,
     evidence: input.evidence,
   };
 }
@@ -94,6 +101,9 @@ function relationEvidence(algo: BaziAlgorithmResult): EvidenceItem[] {
   for (const r of br.harms) {
     items.push(ev("branch_relation", "overall", "六害", r.description, 1.8));
   }
+  for (const r of br.breaks) {
+    items.push(ev("branch_relation", "overall", "地支破", r.description, 1.7));
+  }
   for (const r of br.punishments) {
     items.push(ev("branch_relation", "overall", "刑", r.description, 1.8));
   }
@@ -121,11 +131,46 @@ function sectionOverview(algo: BaziAlgorithmResult): ReportSection | null {
     ev("five_elements", "overall", "五行主气", `最旺${f.strongestElement}、最弱${f.weakestElement}，平衡度${f.balanceScore}`, 2.2),
   ];
   return makeSection({
-    title: "命盘概览",
+    title: "命盘总览",
     conclusion: `此盘以${dm.dayMaster}日主为核心，四柱结构为${fmtPillars(algo)}。`,
     evidence,
     impact: `月令${algo.pillars.month.branch}与五行主气会影响日主承压、表达和取用倾向，需结合后续五行、十神和大运流年一起观察。`,
     advice: "先把四柱、日主、月令作为主轴，再阅读分项结论；单一标签不宜单独下结论。",
+  });
+}
+
+function sectionPillars(algo: BaziAlgorithmResult): ReportSection | null {
+  const evidence = [
+    ev("natal_pillar", "overall", "年柱", `年柱${algo.pillarStrings.year}，以立春为年界。`, 2.4, {
+      relatedPillars: [algo.pillarStrings.year],
+    }),
+    ev("natal_pillar", "overall", "月柱", `月柱${algo.pillarStrings.month}，以节气月令为界。`, 2.6, {
+      relatedPillars: [algo.pillarStrings.month],
+    }),
+    ev("natal_pillar", "overall", "日柱", `日柱${algo.pillarStrings.day}，日干${algo.pillars.day.stem}为日主。`, 2.8, {
+      relatedPillars: [algo.pillarStrings.day],
+    }),
+    ev("natal_pillar", "overall", "时柱", `时柱${algo.pillarStrings.hour}，按修正后时间与五鼠遁推导。`, 2.4, {
+      relatedPillars: [algo.pillarStrings.hour],
+    }),
+  ];
+  if (algo.locationInfluence?.useTrueSolarTime) {
+    evidence.push(
+      ev(
+        "location",
+        "overall",
+        "真太阳时",
+        `真太阳时修正${(algo.locationInfluence.correctionMinutes ?? 0).toFixed(2)}分钟，时柱${algo.locationInfluence.hourPillarChanged ? "发生变化" : "未发生变化"}。`,
+        2.2,
+      ),
+    );
+  }
+  return makeSection({
+    title: "四柱结构",
+    conclusion: `${fmtPillars(algo)}；日主为${algo.pillars.day.stem}，月令为${algo.pillars.month.branch}。`,
+    evidence,
+    impact: "四柱是后续五行、十神、调候、夫妻宫、大运流年的共同基准。",
+    advice: "先核对出生时间、地点与真太阳时，再阅读后续分项。",
   });
 }
 
@@ -144,7 +189,7 @@ function sectionFiveElements(algo: BaziAlgorithmResult): ReportSection | null {
     ev("five_elements", "overall", "季节权重", f.notes.join("；"), 1.8),
   ];
   return makeSection({
-    title: "五行结构",
+    title: "五行分布",
     conclusion: `五行呈现${f.strongestElement}较突出、${f.weakestElement}相对不足的结构。`,
     evidence,
     impact: `${f.strongestElement}的处事风格更容易被看见，${f.weakestElement}相关主题宜用习惯和环境慢慢补足。`,
@@ -203,6 +248,28 @@ function sectionTenGods(algo: BaziAlgorithmResult): ReportSection | null {
   });
 }
 
+function sectionClimate(algo: BaziAlgorithmResult): ReportSection | null {
+  const c = algo.climate;
+  const evidence = c.evidence.length
+    ? c.evidence
+    : [
+        ev("climate", "overall", "调候", `调候类型${c.climateType}`, 1.5),
+      ];
+  return makeSection({
+    title: "调候分析",
+    conclusion: `调候类型为${c.climateType}，调节元素倾向为${c.regulatingElements.join("、") || "随结构动态观察"}。`,
+    evidence,
+    impact: [
+      ...c.usefulClimateHints,
+      ...c.riskHints,
+      c.caution,
+    ].join("；") || "调候用于补充寒热燥湿视角，不替代日主强弱和喜用倾向。",
+    advice: c.regulatingElements.length
+      ? `围绕${c.regulatingElements.join("、")}的作息、环境和节奏做温和调节。`
+      : "保持作息稳定，结合流年流月再观察寒热燥湿变化。",
+  });
+}
+
 function sectionRelations(algo: BaziAlgorithmResult): ReportSection | null {
   const evidence = relationEvidence(algo);
   const hasClash = evidence.some((item) => item.detail.includes("冲") || item.detail.includes("刑") || item.detail.includes("害"));
@@ -216,6 +283,68 @@ function sectionRelations(algo: BaziAlgorithmResult): ReportSection | null {
     advice: hasClash
       ? "遇到合作、亲密关系或重要决定时，先确认事实和边界，再推进下一步。"
       : "保持稳定节奏，后续重点看大运流年是否触发新的关系信号。",
+  });
+}
+
+function sectionSpousePalace(algo: BaziAlgorithmResult): ReportSection | null {
+  const s = algo.spousePalace;
+  return makeSection({
+    title: "夫妻宫与感情关系",
+    conclusion: s.summary || `夫妻宫为${s.spousePalace}，伴侣星为${s.spouseStar.stars.join("、")}。`,
+    evidence: s.evidence,
+    impact: [
+      s.isClashed ? "夫妻宫见冲，关系与家庭节奏有波动倾向。" : "",
+      s.isCombined ? "夫妻宫见合会，关系议题容易被牵动。" : "",
+      s.isHarmed || s.isBroken ? "见害或破时，细节摩擦和计划反复需要多确认。" : "",
+      s.activatedByTargetYear ? "目标流年引动夫妻宫，相关议题更值得留意。" : "",
+    ].filter(Boolean).join(" ") || "夫妻宫未见明显强触发，仍需结合流期观察。",
+    advice: "感情关系建议来自夫妻宫、伴侣星和关系触发证据，宜用沟通、边界和稳定节奏处理。",
+  });
+}
+
+function sectionCareer(algo: BaziAlgorithmResult): ReportSection | null {
+  const c = algo.careerAnalysis;
+  return makeSection({
+    title: "事业方向",
+    conclusion: c.conclusion,
+    evidence: c.evidence,
+    impact: `关键因子：${c.factors.join("、")}。${c.caution}`,
+    advice: c.advice,
+  });
+}
+
+function sectionWealth(algo: BaziAlgorithmResult): ReportSection | null {
+  const w = algo.wealthAnalysis;
+  return makeSection({
+    title: "财运模式",
+    conclusion: w.conclusion,
+    evidence: w.evidence,
+    impact: `关键因子：${w.factors.join("、")}。${w.caution}`,
+    advice: w.advice,
+  });
+}
+
+function sectionFamily(algo: BaziAlgorithmResult): ReportSection | null {
+  const f = algo.familyAnalysis;
+  return makeSection({
+    title: "家庭责任",
+    conclusion: f.conclusion,
+    evidence: f.evidence,
+    impact: `关键因子：${f.factors.join("、")}。${f.caution}`,
+    advice: f.advice,
+  });
+}
+
+function sectionHealth(algo: BaziAlgorithmResult): ReportSection | null {
+  const h = algo.healthTendency;
+  const themes = h.tendencies.map((t) => t.theme).join("、") || "健康象意平和";
+  const advice = h.tendencies[0]?.advice ?? "维持规律作息、饮食和运动，持续观察现实反馈。";
+  return makeSection({
+    title: "健康倾向",
+    conclusion: `命理健康象意主要关注${themes}。`,
+    evidence: h.evidence,
+    impact: h.tendencies.map((t) => `${t.theme}：${t.reason}`).join("；"),
+    advice: `${advice} ${h.disclaimer}`,
   });
 }
 
@@ -289,7 +418,7 @@ function sectionLuckCycle(algo: BaziAlgorithmResult): ReportSection | null {
       : ev("luck_cycle", "timing", "当前大运", "未能定位当前大运，通常因性别未知或大运数据不足", 1.4),
   ];
   return makeSection({
-    title: "大运趋势",
+    title: "当前大运",
     conclusion: current ? `当前重点观察${current.pillar.stem}${current.pillar.branch}大运。` : "当前不展开具体大运判断。",
     evidence,
     impact: current
@@ -309,7 +438,7 @@ function sectionYearly(algo: BaziAlgorithmResult): ReportSection | null {
       ]
     : [ev("year_transit", "timing", "目标流年", "未填写目标年份，本节不展开具体流年判断", 1.2)];
   return makeSection({
-    title: "流年趋势",
+    title: "目标流年",
     conclusion: y ? `${y.targetYear}年以${y.yearPillar}流年作为年度观察主轴。` : "未指定目标年份。",
     evidence,
     impact: y
@@ -329,7 +458,7 @@ function sectionLuckOverview(algo: BaziAlgorithmResult, focusArea: string): Repo
   ].slice(0, 10);
   const best = [...all.day.scores].sort((a, b) => b.score - a.score)[0];
   return makeSection({
-    title: "近期运势概览",
+    title: "流月 / 流日提示",
     conclusion: `日${all.day.overallScore}分、周${all.week.overallScore}分、月${all.month.overallScore}分、年${all.year.overallScore}分；今日相对突出方向为${best.label}。`,
     evidence,
     impact: `日运看流日${all.day.transitSummary.dayPillar}，月运看流月${all.month.transitSummary.monthPillar}，年运看流年${all.year.transitSummary.yearPillar}，不同周期权重不同。`,
@@ -355,7 +484,7 @@ function sectionSpecificAdvice(
   const evidence = focusRules.flatMap((r) => r.evidence.slice(0, 2));
   const top = focusRules[0];
   return makeSection({
-    title: "具体建议",
+    title: "行动建议",
     conclusion: top
       ? `${labelFocusArea(focusArea)}方向优先参考「${top.tags[0] ?? top.ruleId}」这类证据。`
       : `${labelFocusArea(focusArea)}方向暂未命中特别强的规则。`,
@@ -368,6 +497,63 @@ function sectionSpecificAdvice(
     advice: focusRules.length
       ? focusRules.map((r) => `${r.message}（依据：${r.evidence[0]?.detail}）`).join(" ")
       : `围绕${algo.fiveElements.weakestElement}相关习惯做温和补足，并观察执行反馈。`,
+  });
+}
+
+function sectionRisk(algo: BaziAlgorithmResult): ReportSection | null {
+  const evidence = [
+    ...relationEvidence(algo).filter((item) =>
+      /冲|刑|害|破|压力|反复|波动/.test(item.detail),
+    ),
+    ...algo.climate.evidence.filter((item) => /寒|燥|波动|风险/.test(item.detail)),
+    ...algo.spousePalace.evidence.filter((item) =>
+      /冲|害|破|刑|波动|摩擦/.test(item.detail),
+    ),
+    ...algo.healthTendency.evidence.slice(0, 2),
+  ].slice(0, 10);
+
+  return makeSection({
+    title: "风险点",
+    conclusion: evidence.length
+      ? "需要留意的不是具体事件，而是冲动、压力、寒热燥湿或责任牵动带来的节奏偏差。"
+      : "未见特别集中的风险信号。",
+    evidence: evidence.length
+      ? evidence
+      : [ev("score_model", "advice", "风险点", "未见特别集中的冲刑害破或寒热燥湿风险信号。", 1.2)],
+    impact: "风险点只提示处理方式：放慢、确认、复核、留弹性，不作现实事件断语。",
+    advice: "遇到重要关系、工作或健康相关事项时，先核对事实与身体反馈，再决定推进节奏。",
+  });
+}
+
+function sectionBasisSummary(algo: BaziAlgorithmResult): ReportSection | null {
+  const evidence = [
+    ev("natal_pillar", "overall", "四柱主轴", fmtPillars(algo), 3),
+    ev("day_master_strength", "overall", "日主强弱", `日主${algo.dayMasterStrength.dayMaster}，强弱${labelStrength(algo.dayMasterStrength.strengthLevel)}。`, 2.6),
+    ev("five_elements", "overall", "五行分布", `最旺${algo.fiveElements.strongestElement}、最弱${algo.fiveElements.weakestElement}。`, 2.4),
+    ev("ten_gods", "overall", "十神结构", `主导十神${algo.tenGods.dominantTendency.join("、")}。`, 2.2),
+    ev("climate", "overall", "调候", `调候类型${algo.climate.climateType}，调节倾向${algo.climate.regulatingElements.join("、") || "动态观察"}。`, 2.2),
+    ev("useful_god", "advice", "简化模型说明", "格局为格局倾向，喜用为喜用倾向；当前节气若使用近似算法，节气边界附近建议复核。", 2),
+  ];
+  return makeSection({
+    title: "依据摘要",
+    conclusion: "本报告只解释 algorithm_result、rule_results 与 evidence，不输出无依据判断。",
+    evidence,
+    impact: "四柱、月令、五行、十神、调候、合冲刑害、大运与流期共同构成判断链。",
+    advice: "阅读时先看依据，再看结论；边界时间、节气附近与重大决策场景建议复核基础数据。",
+  });
+}
+
+function sectionDisclaimer(algo: BaziAlgorithmResult): ReportSection | null {
+  const evidence = [
+    ev("score_model", "advice", "免责声明", DISCLAIMER, 1.5),
+    ev("health_tendency", "health", "健康免责声明", algo.healthTendency.disclaimer, 1.8),
+  ];
+  return makeSection({
+    title: "免责声明",
+    conclusion: "本报告为传统文化与算法规则分析，只写趋势和倾向。",
+    evidence,
+    impact: "命理结果不能替代现实决策、医学诊断、法律或财务建议。",
+    advice: "把报告作为复盘与自我观察工具，重要事项以现实证据和专业意见为准。",
   });
 }
 
@@ -412,23 +598,33 @@ export function generateBaziReport(
 
   const sections = [
     sectionOverview(algo),
-    sectionFiveElements(algo),
+    sectionPillars(algo),
     sectionDayMaster(algo),
+    sectionFiveElements(algo),
     sectionTenGods(algo),
+    sectionClimate(algo),
     sectionRelations(algo),
-    sectionStars(algo),
-    sectionPatterns(algo),
-    sectionUsefulGods(algo),
+    sectionSpousePalace(algo),
+    sectionCareer(algo),
+    sectionWealth(algo),
+    sectionFamily(algo),
+    sectionHealth(algo),
     sectionLuckCycle(algo),
     sectionYearly(algo),
     sectionLuckOverview(algo, focusArea),
+    sectionRisk(algo),
     sectionSpecificAdvice(algo, ruleResults, focusArea),
+    sectionBasisSummary(algo),
+    sectionDisclaimer(algo),
   ].filter((section): section is ReportSection => !!section);
+
+  const adviceEvidenceIds = sections.flatMap((section) => section.evidenceIds ?? []).slice(0, 16);
 
   return buildReport(
     "传统命理报告",
     summary,
     sections,
     buildAdvice(ruleResults, algo),
+    adviceEvidenceIds,
   );
 }

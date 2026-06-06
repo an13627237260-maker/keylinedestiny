@@ -4,11 +4,14 @@ export type LuckPeriod = "day" | "week" | "month" | "year";
 
 export type LuckCategory =
   | "overall"
+  | "relationship"
   | "love"
   | "wealth"
   | "career"
   | "study"
-  | "social";
+  | "social"
+  | "health"
+  | "family";
 
 export interface LuckScore {
   category: LuckCategory;
@@ -79,20 +82,26 @@ export const LUCK_CATEGORY_COLORS: Record<
   Exclude<LuckCategory, "overall">,
   string
 > = {
+  relationship: "#EC6FAE",
   love: "#EC6FAE",
   wealth: "#D6B56D",
   career: "#6C91E8",
   study: "#41C7D9",
   social: "#B56BE8",
+  health: "#55B97A",
+  family: "#A58A6A",
 };
 
 export const LUCK_CATEGORY_LABELS: Record<
   Exclude<LuckCategory, "overall">,
   string
 > = {
-  love: "爱情",
+  relationship: "感情关系",
+  love: "感情关系",
   wealth: "财富",
   career: "事业",
   study: "学习",
   social: "人际",
+  health: "健康",
+  family: "家庭",
 };

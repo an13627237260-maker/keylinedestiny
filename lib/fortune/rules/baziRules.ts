@@ -495,17 +495,19 @@ function buildAdviceRules(): Rule[] {
     },
     {
       id: "relation-check",
-      msg: "命局见冲刑害时，遇到分歧宜先厘清事实，再讨论立场与责任边界。",
+      msg: "命局见冲刑害破时，遇到分歧宜先厘清事实，再讨论立场与责任边界。",
       condition: (ctx) =>
         ctx.algo.branchRelations.clashes.length > 0 ||
         ctx.algo.branchRelations.harms.length > 0 ||
+        ctx.algo.branchRelations.breaks.length > 0 ||
         ctx.algo.branchRelations.punishments.length > 0,
       evidence: (ctx) => [
         ...ctx.algo.branchRelations.clashes.map((c) => c.description),
         ...ctx.algo.branchRelations.harms.map((c) => c.description),
+        ...ctx.algo.branchRelations.breaks.map((c) => c.description),
         ...ctx.algo.branchRelations.punishments.map((c) => c.description),
       ].slice(0, 3),
-      tags: ["合冲刑害"],
+      tags: ["合冲刑害破"],
     },
     {
       id: "portfolio",
@@ -572,6 +574,16 @@ function buildRelationRules(): Rule[] {
       evidence: (ctx) => ctx.algo.branchRelations.combinations.map((c) => c.description),
     },
     {
+      id: "branch-break",
+      category: "personality",
+      priority: 65,
+      condition: (ctx) => ctx.algo.branchRelations.breaks.length > 0,
+      score: 61,
+      tags: ["地支破"],
+      message: "命局地支见破象，计划与细节容易有反复倾向，宜保留弹性并多做确认。",
+      evidence: (ctx) => ctx.algo.branchRelations.breaks.map((c) => c.description),
+    },
+    {
       id: "stem-clash",
       category: "personality",
       priority: 64,
@@ -589,6 +601,7 @@ function buildRelationRules(): Rule[] {
       condition: (ctx) =>
         ctx.algo.branchRelations.clashes.length === 0 &&
         ctx.algo.branchRelations.harms.length === 0 &&
+        ctx.algo.branchRelations.breaks.length === 0 &&
         ctx.algo.branchRelations.punishments.length === 0,
       score: 50,
       tags: ["平稳"],
@@ -596,6 +609,7 @@ function buildRelationRules(): Rule[] {
       evidence: (ctx) => [
         `地支冲 ${ctx.algo.branchRelations.clashes.length} 个`,
         `地支害 ${ctx.algo.branchRelations.harms.length} 个`,
+        `地支破 ${ctx.algo.branchRelations.breaks.length} 个`,
         `地支刑 ${ctx.algo.branchRelations.punishments.length} 个`,
       ],
     },

@@ -30,7 +30,7 @@ export const baziInputSchema = z
     timezone: z.string().min(1),
     useTrueSolarTime: z.boolean().default(true),
     focusArea: z
-      .enum(["overall", "love", "career", "wealth", "study", "health"])
+      .enum(["overall", "career", "wealth", "relationship", "love", "health", "study", "family"])
       .default("overall"),
     targetYear: z.number().int().optional(),
     options: baziOptionsSchema.optional(),
